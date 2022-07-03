@@ -1,7 +1,6 @@
 from kafka.admin import KafkaAdminClient, NewTopic
 
 from settings import BOOTSTRAP_SERVERS as setting_booststrap_server
-import base_classes
 
 
 class KafkaManagement:

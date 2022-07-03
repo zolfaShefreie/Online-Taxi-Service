@@ -126,13 +126,13 @@ class BaseBlock:
         """
         raise NotImplementedError
 
-    def _send_data(self, data):
+    def _send_data(self, data, key=None):
         """
         send data via producer to specific topic
         :param data:
         :return:
         """
-        self.producer.send(self.producer_topic, data)
+        self.producer.send(self.producer_topic, key=key, value=data)
 
     @staticmethod
     def _validate_parameter(producer_topic, consumer_topic, bootstrap_servers, consumer_group_id, block_type,
