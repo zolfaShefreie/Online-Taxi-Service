@@ -24,8 +24,8 @@ class BaseBlock:
         :param args:
         :param kwargs:
         """
-        self.validate_parameter(producer_topic, consumer_topic, bootstrap_servers, consumer_group_id,
-                                block_type, spark_session, *args, **kwargs)
+        self._validate_parameter(producer_topic, consumer_topic, bootstrap_servers, consumer_group_id,
+                                 block_type, spark_session, *args, **kwargs)
         self.producer_topic = producer_topic
         self.consumer_topic = consumer_topic
         self.bootstrap_servers = bootstrap_servers
@@ -34,16 +34,40 @@ class BaseBlock:
         self.spark_session = spark_session
 
         self.consumer_df = None
+        self.producer = None
+        self.consumer = None
 
-        # self.producer = KafkaProducer(bootstrap_servers=bootstrap_servers,
-        #                               value_serializer=lambda v: json.dumps(v).encode('utf-8'))
-        #
-        # # TODO: check auto_offset_reset
-        # self.consumer = KafkaConsumer(consumer_topic, bootstrap_servers=bootstrap_servers,
-        #                               auto_offset_reset='earliest',
-        #                               group_id=consumer_group_id) if consumer_topic else None
+        run_functions = {BlockType.normal: self._normal_run, BlockType.spark: self._spark_run}
+        self.run = run_functions[block_type]
 
-    def spark_entry_setup(self):
+    def _normal_run(self):
+        """
+        run normal block
+        Example Implementation:
+            self._normal_setup()
+            if self.consumer:
+                for each in self.consumer:
+                    result = self._produce_answer(each)
+                    self._send_data(result)
+
+            else:
+                get data from some where and sent result
+        :return:
+        """
+        raise NotImplementedError
+
+    def _spark_run(self):
+        """
+        run spark block
+        Example Implementation:
+            df = self._spark_entry_setup()
+            df_result = df after some process on df
+            self._spark_output_setup()
+        :return:
+        """
+        raise NotImplementedError
+
+    def _spark_entry_setup(self):
         """
         get entry spark dataframe form kafka channel
         :return: df from kafka
@@ -58,7 +82,7 @@ class BaseBlock:
 
         return self.consumer_df
 
-    def spark_output_setup(self, result_df):
+    def _spark_output_setup(self, result_df):
         """
         put stream result_df to kafka
         :param result_df:
@@ -71,6 +95,19 @@ class BaseBlock:
                  .option("kafka.bootstrap.servers", self.bootstrap_servers) \
                  .option("topic", self.producer_topic) \
                  .save()
+
+    def _normal_setup(self):
+        """
+        normal initial setup
+        :return:
+        """
+        self.producer = KafkaProducer(bootstrap_servers=self.bootstrap_servers,
+                                      value_serializer=lambda v: json.dumps(v).encode('utf-8'))
+
+        # TODO: check auto_offset_reset
+        self.consumer = KafkaConsumer(self.consumer_topic, bootstrap_servers=self.bootstrap_servers,
+                                      auto_offset_reset='earliest',
+                                      group_id=self.consumer_group_id) if self.consumer_topic else None
 
     def _produce_answer(self, entry_data):
         """
@@ -88,19 +125,23 @@ class BaseBlock:
         """
         self.producer.send(self.producer_topic, data)
 
-    def run(self):
+    @staticmethod
+    def _validate_parameter(producer_topic, consumer_topic, bootstrap_servers, consumer_group_id, block_type,
+                            spark_session, *args, **kwargs):
         """
-        the main management for block process
-        get entry with consumer object (if it exists)
-        do some process on entry_data
-        send the result
+        validate parameters of object
+        :param producer_topic:
+        :param consumer_topic:
+        :param bootstrap_servers:
+        :param consumer_group_id:
+        :param block_type:
+        :param spark_session:
+        :param args:
+        :param kwargs:
         :return:
         """
-        raise NotImplementedError
-
-    @staticmethod
-    def validate_parameter(producer_topic, consumer_topic, bootstrap_servers, consumer_group_id, block_type,
-                           spark_session, param, param1):
+        if (not producer_topic) or (not bootstrap_servers):
+            raise Exception("invalid value for primary parameters")
         if block_type == BlockType.spark:
             if spark_session is None:
                 raise Exception("the spark block must have spark session as parameter")
