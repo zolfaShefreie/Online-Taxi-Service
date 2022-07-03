@@ -40,6 +40,15 @@ class BaseBlock:
         run_functions = {BlockType.normal: self._normal_run, BlockType.spark: self._spark_run}
         self.run = run_functions[block_type]
 
+    @staticmethod
+    def _entry_value_serializer(data):
+        """
+        serialize the data
+        :param data: string form of data
+        :return: new format of data
+        """
+        return json.dumps(data).encode('utf-8')
+
     def _normal_run(self):
         """
         run normal block
@@ -102,7 +111,7 @@ class BaseBlock:
         :return:
         """
         self.producer = KafkaProducer(bootstrap_servers=self.bootstrap_servers,
-                                      value_serializer=lambda v: json.dumps(v).encode('utf-8'))
+                                      value_serializer=self._entry_value_serializer)
 
         # TODO: check auto_offset_reset
         self.consumer = KafkaConsumer(self.consumer_topic, bootstrap_servers=self.bootstrap_servers,
