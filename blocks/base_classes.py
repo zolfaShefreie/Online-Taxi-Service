@@ -1,4 +1,5 @@
 from kafka import KafkaProducer, KafkaConsumer
+from pyspark.sql.functions import from_json, to_json, struct
 import json
 import enum
 
@@ -49,6 +50,21 @@ class BaseBlock:
         """
         return json.dumps(data).encode('utf-8')
 
+    @staticmethod
+    def _get_value_schema():
+        """
+        in spark with have one column value that have json type. this method return schema of value column
+        :return:
+        """
+        raise NotImplementedError
+
+    @staticmethod
+    def _get_value_columns():
+        """
+        :return: a list of value columns that used to convert to json
+        """
+        raise NotImplementedError
+
     def _normal_run(self):
         """
         run normal block
@@ -86,9 +102,11 @@ class BaseBlock:
             .option("kafka.bootstrap.servers", self.bootstrap_servers) \
             .option("subscribe", self.consumer_topic) \
             .load()
-        # TODO: check can cast as json? if can't, find solution
-        self.consumer_df.selectExpr("CAST(key AS STRING)", "CAST(value AS JSON)")
 
+        # self.consumer_df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
+
+        value_schema = self._get_value_schema()
+        self.consumer_df.withColumn("value", from_json("value", value_schema))
         return self.consumer_df
 
     def _spark_output_setup(self, result_df):
@@ -98,7 +116,10 @@ class BaseBlock:
         :return:
         """
         # TODO: check can cast as json? if can't, find solution
-        result_df.selectExpr("CAST(key AS STRING)", "CAST(value AS JSON)") \
+        col_list = self._get_value_columns()
+        # result_df['value'] = result_df[col_list].to_dict(orient='records')
+        result_df.withColumn("value", to_json(struct([x for x in col_list])))\
+                 .drop(*col_list) \
                  .write \
                  .format("kafka") \
                  .option("kafka.bootstrap.servers", self.bootstrap_servers) \
