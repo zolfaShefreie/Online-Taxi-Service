@@ -16,7 +16,7 @@ class FileStreamBlock(BaseBlock, ABC):
     DATETIME_FORMAT = "%m/%d/%Y %I:%M:%S %p"
 
     def __init__(self, *args, **kwargs):
-        super().__init__(consumer_topic=None, block_type=BlockType.normal, *args, **kwargs)
+        super().__init__(consumer_topic=None, block_type=BlockType.normal, consumer_group_id=None, *args, **kwargs)
 
     def _produce_answer(self, entry_data):
         """

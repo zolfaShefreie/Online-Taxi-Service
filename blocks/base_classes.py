@@ -9,9 +9,9 @@ class BlockType(enum.Enum):
 
 
 class BaseBlock:
-    
-    def __init__(self,  producer_topic: str, consumer_topic: str, bootstrap_servers: str, consumer_group_id: str,
-                 block_type: BlockType=BlockType.normal, spark_session=None,
+
+    def __init__(self, producer_topic: str, bootstrap_servers: str, consumer_topic: str = None,
+                 consumer_group_id: str = None, block_type: BlockType = BlockType.normal, spark_session=None,
                  *args, **kwargs):
         """
         initial function for each block.
@@ -82,7 +82,7 @@ class BaseBlock:
         :return: df from kafka
         """
 
-        self.consumer_df = self.spark_session.readStream.format("kafka")\
+        self.consumer_df = self.spark_session.readStream.format("kafka") \
             .option("kafka.bootstrap.servers", self.bootstrap_servers) \
             .option("subscribe", self.consumer_topic) \
             .load()
@@ -110,13 +110,13 @@ class BaseBlock:
         normal initial setup
         :return:
         """
-        self.producer = KafkaProducer(bootstrap_servers=self.bootstrap_servers,
-                                      value_serializer=self._entry_value_serializer)
-
         # TODO: check auto_offset_reset
         self.consumer = KafkaConsumer(self.consumer_topic, bootstrap_servers=self.bootstrap_servers,
                                       auto_offset_reset='earliest',
                                       group_id=self.consumer_group_id) if self.consumer_topic else None
+        
+        self.producer = KafkaProducer(bootstrap_servers=self.bootstrap_servers,
+                                      value_serializer=self._entry_value_serializer)
 
     def _produce_answer(self, entry_data):
         """
