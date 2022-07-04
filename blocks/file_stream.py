@@ -20,12 +20,7 @@ class FileStreamBlock(BaseBlock, ABC):
         :param entry_data:
         :return:
         """
-        data = dict()
-        data['Date/Time'] = entry_data['Date/Time']
-        data['Lat'] = entry_data['Lat']
-        data['Lon'] = entry_data['Lon']
-        data['Base'] = entry_data['Base']
-        return data
+        return entry_data.to_dict()
 
     def _normal_run(self):
         self._normal_setup()
@@ -37,5 +32,5 @@ class FileStreamBlock(BaseBlock, ABC):
         key = 0
         for row in range(len(df)):
             key += 1
-            produced_data = self._produce_answer(df.loc[row].to_dict())
+            produced_data = self._produce_answer(df.loc[row])
             self._send_data(produced_data, key=str(key))
