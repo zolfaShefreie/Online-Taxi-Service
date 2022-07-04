@@ -1,4 +1,5 @@
 from kafka.admin import KafkaAdminClient, NewTopic
+import time
 
 from settings import BOOTSTRAP_SERVERS as setting_booststrap_server
 
@@ -28,12 +29,17 @@ class KafkaManagement:
             topic_list.append(NewTopic(name=topic,
                                        num_partitions=self.TOPIC_PARTITION,
                                        replication_factor=self.TOPIC_REPLICATION))
-        try:
-            result_messages = self.admin_client.create_topics(new_topics=topic_list, validate_only=False)
-            return result_messages
-        except Exception as e:
-            # suppose exception for existed topic
-            print(e)
+        try_count = 0
+        while True:
+            try_count += 1
+            print(f"try create topics: {try_count}")
+            try:
+                result_messages = self.admin_client.create_topics(new_topics=topic_list, validate_only=False)
+                return result_messages
+            except Exception as e:
+                # suppose exception for existed topic
+                print(e)
+                time.sleep(1)
 
     def _delete_topics(self):
         """
@@ -49,3 +55,7 @@ class KafkaManagement:
 
     def run(self):
         pass
+
+
+if __name__ == '__main__':
+    kafka_manage = KafkaManagement()
