@@ -120,19 +120,20 @@ class BaseBlock:
 
     def _produce_answer(self, entry_data):
         """
-        this function do some process on entry_data and return answer
+        this function do some process on entry_data and return answer for self._send_data arguments
         :param entry_data:
         :return:
         """
         raise NotImplementedError
 
-    def _send_data(self, data, key=None):
+    def _send_data(self, data, key=None, headers=None, partition=None, timestamp_ms=None):
         """
         send data via producer to specific topic
         :param data:
         :return:
         """
-        self.producer.send(self.producer_topic, key=key, value=data)
+        self.producer.send(self.producer_topic, key=key, value=data, headers=headers, partition=partition,
+                           timestamp_ms=timestamp_ms)
 
     @staticmethod
     def _validate_parameter(producer_topic, consumer_topic, bootstrap_servers, consumer_group_id, block_type,
