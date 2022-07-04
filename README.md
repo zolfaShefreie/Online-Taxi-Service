@@ -10,5 +10,6 @@ these functionalities, some tools are used in this project:
 you can access the dataset files in this [link](https://drive.google.com/drive/folders/1rt3LWG1KMenBejpJ86WWYrlohBaFNQCl).
 
 ## Prerequisites for running
-1. run kafka server
+1. run kafka server<br/>
+make sure "delete.topic.enable=true" is placed in the server.properties and enter bootstrap-server address in .env file
 2. 
