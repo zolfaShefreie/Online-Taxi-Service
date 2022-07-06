@@ -134,3 +134,6 @@ dmypy.json
 
 data.csv
 sorted_data.csv
+
+#spark checkpoints
+checkpoint/
