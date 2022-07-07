@@ -1,6 +1,7 @@
 from abc import ABC
 from pyspark.mllib.clustering import StreamingKMeans
 from pyspark.sql.types import StructType, StructField, FloatType, StringType
+from pyspark.sql.functions import lit
 
 from blocks.base_classes import BaseBlock, BlockType
 
@@ -44,8 +45,18 @@ class OnlineClusteringBlock(BaseBlock, ABC):
 
     def _spark_run(self):
         df = self._spark_entry_setup()
+        df.printSchema()
+        df1 = df.withColumn("value", lit("hey"))
         # cluster_train_data = df.select('Lat', 'Lon')
         # self.cluster_model.trainOn(cluster_train_data)
-        self._spark_output_setup(df)
+        self._spark_output_setup(df1)
+        # rawQuery = \
+        #     df1 \
+        #         .writeStream \
+        #         .format("console") \
+        #         .outputMode("append") \
+        #         .start()
+
+        # rawQuery.awaitTermination()
 
 

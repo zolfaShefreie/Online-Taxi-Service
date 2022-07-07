@@ -1,9 +1,13 @@
 from kafka.admin import KafkaAdminClient, NewTopic
 import time
 import threading
+import findspark
+findspark.init()
+from pyspark.sql import SparkSession
 
 from settings import BOOTSTRAP_SERVERS as setting_bootstrap_server
 from blocks.file_stream import FileStreamBlock
+from blocks.online_cluster import OnlineClusteringBlock
 
 
 class KafkaManagement:
@@ -11,6 +15,8 @@ class KafkaManagement:
     TOPIC_PARTITION = 1
     TOPIC_REPLICATION = 1
     BOOTSTRAP_SERVERS = setting_bootstrap_server
+    SPARK_SESSION = SparkSession.builder.config("spark.driver.memory", "2g").appName('taxi').getOrCreate()
+    SPARK_SESSION.conf.set("spark.sql.shuffle.partitions", 5)
 
     def __init__(self):
         """
@@ -49,7 +55,7 @@ class KafkaManagement:
         :return: result messages (the request is successfully done or not)
         """
         try:
-            result_messages = self.admin_client.delete_topics(self.TOPICS)
+            result_messages = self.admin_client.delete_topics(self.TOPICS+['__consumer_offsets'])
             return result_messages
         except Exception as e:
             # suppose exception for not existed topic
@@ -73,6 +79,10 @@ class KafkaManagement:
         # blocks
         file_streamer = FileStreamBlock(bootstrap_servers=self.BOOTSTRAP_SERVERS, producer_topic=self.TOPICS[0])
         self._make_start_block_thread(block=file_streamer, key='file_streamer')
+
+        online_cluster = OnlineClusteringBlock(bootstrap_servers=self.BOOTSTRAP_SERVERS, producer_topic=self.TOPICS[1],
+                                               consumer_topic=self.TOPICS[0], spark_session=self.SPARK_SESSION)
+        online_cluster.run()
 
         # wait the all threads run
         while True:

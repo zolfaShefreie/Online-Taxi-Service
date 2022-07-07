@@ -100,13 +100,13 @@ class BaseBlock:
 
         self.consumer_df = self.spark_session.readStream.format("kafka") \
             .option("kafka.bootstrap.servers", self.bootstrap_servers) \
+            .option("kafka.max.poll.records", 10) \
+            .option("maxOffsetsPerTrigger", 10) \
             .option("subscribe", self.consumer_topic) \
+            .option("startingOffsets", "earliest") \
             .load()
 
-        # self.consumer_df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
-
-        value_schema = self._get_value_schema()
-        self.consumer_df.withColumn("value", from_json("value", value_schema))
+        self.consumer_df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
         return self.consumer_df
 
     def _spark_output_setup(self, result_df):
@@ -118,13 +118,19 @@ class BaseBlock:
         # TODO: check can cast as json? if can't, find solution
         col_list = self._get_value_columns()
         # result_df['value'] = result_df[col_list].to_dict(orient='records')
-        result_df.withColumn("value", to_json(struct([x for x in col_list])))\
-                 .drop(*col_list) \
-                 .write \
+        # result_df.withColumn("value", to_json(struct([x for x in col_list])))\
+        #          .drop(*col_list) \
+        r_df = result_df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)") \
+                 .writeStream \
                  .format("kafka") \
                  .option("kafka.bootstrap.servers", self.bootstrap_servers) \
                  .option("topic", self.producer_topic) \
-                 .save()
+                 .option("checkpointLocation", "checkpoint") \
+                    .trigger(processingTime='2 seconds') \
+                    .outputMode("update") \
+            .start().awaitTermination()
+
+        # self.spark_session.streams.awaitAnyTermination()
 
     def _normal_setup(self):
         """
@@ -177,7 +183,7 @@ class BaseBlock:
             if spark_session is None:
                 raise Exception("the spark block must have spark session as parameter")
 
-        if block_type == BlockType.normal:
+        elif block_type == BlockType.normal:
             pass
 
         else:
