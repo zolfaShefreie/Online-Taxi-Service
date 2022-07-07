@@ -17,7 +17,7 @@ class ElasticAnalyseBlock(BaseBlock, ABC):
     def _generate_index(self):
         self.es.indices.create(index="taxi_service_index", mappings={
             "properties": {
-                "Date/Time": {"type": "date", format: "MM/dd/yyyy HH:mm:ss", "index": "true", "store": "true"},
+                "Date/Time": {"type": "date", "format": "MM/dd/yyyy HH:mm:ss", "index": "true", "store": "true"},
                 "Lat": {"type": "float", "index": "true", "store": "true"},
                 "Lon": {"type": "float", "index": "true", "store": "true"},
                 "Base": {"type": "text", "index": "true", "store": "true"},
