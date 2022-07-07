@@ -4,10 +4,11 @@ import threading
 
 from settings import BOOTSTRAP_SERVERS as setting_bootstrap_server
 from blocks.file_stream import FileStreamBlock
+from blocks.elastic_analyse import ElasticAnalyseBlock
 
 
 class KafkaManagement:
-    TOPICS = ['FileDataTopic', 'ClusterTopic', ]
+    TOPICS = ['FileDataTopic', 'ClusterTopic', 'ElasticTopic', ]
     TOPIC_PARTITION = 1
     TOPIC_REPLICATION = 1
     BOOTSTRAP_SERVERS = setting_bootstrap_server
@@ -73,6 +74,12 @@ class KafkaManagement:
         # blocks
         file_streamer = FileStreamBlock(bootstrap_servers=self.BOOTSTRAP_SERVERS, producer_topic=self.TOPICS[0])
         self._make_start_block_thread(block=file_streamer, key='file_streamer')
+        
+        # elasticsearch block
+        elastic_analyser = ElasticAnalyseBlock(consumer_topic=self.TOPICS[0], bootstrap_servers=self.BOOTSTRAP_SERVERS,
+                                               producer_topic=self.TOPICS[2])
+        # TODO consumer_topic=self.TOPICS[1]
+        self._make_start_block_thread(block=elastic_analyser, key='elastic_analyser')
 
         # wait the all threads run
         while True:
