@@ -1,34 +1,44 @@
 from abc import ABC
 import json
 from elasticsearch import Elasticsearch
+import datetime
 
 from blocks.base_classes import BaseBlock, BlockType
 from settings import ELASTIC_SERVER, ELASTIC_PASSWORD
 
 
 class ElasticAnalyseBlock(BaseBlock, ABC):
-    es = Elasticsearch(hosts=ELASTIC_SERVER, verify_certs=False, basic_auth=("elastic", ELASTIC_PASSWORD), timeout=30)
-    data_dic = dict()
-    bulk_data = list()
 
-    def __init__(self, *args, **kwargs):
+    es = Elasticsearch(hosts=ELASTIC_SERVER, verify_certs=False,
+                       basic_auth=("elastic", ELASTIC_PASSWORD) if ELASTIC_PASSWORD else None,
+                       timeout=30)
+    DATETIME_FORMAT = "%m/%d/%Y %H:%M:%S"
+
+    def __init__(self, index_name="taxi_service_index", *args, **kwargs):
         super().__init__(block_type=BlockType.normal, consumer_group_id=None, *args, **kwargs)
+        self.index_name = index_name
 
     def _generate_index(self):
-        self.es.indices.create(index="taxi_service_index", mappings={
-            "properties": {
-                "Date/Time": {"type": "date", format: "MM/dd/yyyy HH:mm:ss", "index": "true", "store": "true"},
-                "Lat": {"type": "float", "index": "true", "store": "true"},
-                "Lon": {"type": "float", "index": "true", "store": "true"},
-                "Base": {"type": "text", "index": "true", "store": "true"},
-                "Cluster_number": {"type": "integer", "index": "true", "store": "true"}
-            }
-        })
+        """
+        generate elastic index if it does not exist
+        :return:
+        """
+        if not self.es.indices.exists(index=self.index_name):
+            self.es.indices.create(index=self.index_name, mappings={
+                "properties": {
+                    "Date/Time": {"type": "date", "format": "MM/dd/yyyy HH:mm:ss", "index": "true", "store": "true"},
+                    "Lat": {"type": "float", "index": "true", "store": "true"},
+                    "Lon": {"type": "float", "index": "true", "store": "true"},
+                    "Base": {"type": "text", "index": "true", "store": "true"},
+                    "Cluster_number": {"type": "integer", "index": "true", "store": "true"}
+                }
+            })
 
-    def _produce_answer(self, entry_data):
+    def _produce_answer(self, entry_data, data_id=0):
         """
         save row in elasticsearch
         :param entry_data:
+        :param data_id: document id
         :return:
         """
         # convert class byte to dictionary
@@ -36,8 +46,10 @@ class ElasticAnalyseBlock(BaseBlock, ABC):
 
         self.es.index(
             index='taxi_service_index',
+            id=str(data_id),
             document={
-                'Date/Time': consumer_value['Date/Time'],
+                'Date/Time': datetime.datetime.strptime(consumer_value['Date/Time'],
+                                                        self.DATETIME_FORMAT).strftime(self.DATETIME_FORMAT),
                 'Lat': consumer_value['Lat'],
                 'Lon': consumer_value['Lon'],
                 'Base': consumer_value['Base'],
@@ -52,9 +64,11 @@ class ElasticAnalyseBlock(BaseBlock, ABC):
         """
         self._generate_index()
         self._normal_setup()
+        data_id = 0
         if self.consumer:
             for each in self.consumer:
-                self._produce_answer(each)
+                self._produce_answer(each, data_id=data_id)
+                data_id += 1
                 #self._send_data(result)
 
         else:

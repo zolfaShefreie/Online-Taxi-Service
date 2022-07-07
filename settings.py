@@ -18,5 +18,5 @@ if (RAW_DATA_PATH is None and not os.path.exists(SORTED_DATA_PATH)) or \
     raise Exception("GET NO DATA_PATH")
 
 # variables for elasticsearch settings
-ELASTIC_SERVER = env("ELASTIC_SERVER", default="localhost:9200")
+ELASTIC_SERVER = env("ELASTIC_SERVER", default="http://localhost:9200/")
 ELASTIC_PASSWORD = env("ELASTIC_PASSWORD", default=None)
