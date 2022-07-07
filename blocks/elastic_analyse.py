@@ -2,7 +2,7 @@ from abc import ABC
 import json
 from elasticsearch import Elasticsearch
 
-from base_classes import BaseBlock, BlockType
+from blocks.base_classes import BaseBlock, BlockType
 from settings import ELASTIC_SERVER, ELASTIC_PASSWORD
 
 
