@@ -12,4 +12,8 @@ you can access the dataset files in this [link](https://drive.google.com/drive/f
 ## Prerequisites for running
 1. run kafka server<br/>
 make sure "delete.topic.enable=true" is placed in the server.properties and enter bootstrap-server address in .env file
-2. 
+
+
+## Kibana
+in this project some visualizations and one dashboard is designed. visualizations can be used as one of the visualization 
+in your own dashboard or you can use whole dashboard. in "Saved object" you can import objects.
