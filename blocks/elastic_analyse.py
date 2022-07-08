@@ -30,6 +30,7 @@ class ElasticAnalyseBlock(BaseBlock, ABC):
                     "Lat": {"type": "float", "index": "true", "store": "true"},
                     "Lon": {"type": "float", "index": "true", "store": "true"},
                     "Base": {"type": "text", "index": "true", "store": "true"},
+                    "Location": {"type": "geo_point", "index": "true", "store": "true"},
                     "Cluster_number": {"type": "integer", "index": "true", "store": "true"}
                 }
             })
@@ -53,7 +54,11 @@ class ElasticAnalyseBlock(BaseBlock, ABC):
                 'Lat': consumer_value['Lat'],
                 'Lon': consumer_value['Lon'],
                 'Base': consumer_value['Base'],
-                'Cluster_number': 0
+                'Cluster_number': 0,
+                "Location": {
+                    "lat": consumer_value['Lat'],
+                    "lon": consumer_value['Lon']
+                }
             })
 
     def _normal_run(self):
