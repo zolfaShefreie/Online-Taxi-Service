@@ -21,4 +21,5 @@ if (RAW_DATA_PATH is None and not os.path.exists(SORTED_DATA_PATH)) or \
 ELASTIC_SERVER = env("ELASTIC_SERVER", default="http://localhost:9200/")
 ELASTIC_PASSWORD = env("ELASTIC_PASSWORD", default=None)
 
-ELASTIC_TIMESPAN = {'start':'', 'end':''}
+ELASTIC_STARTTIME = "09/01/2014 00:01:00"
+ELASTIC_ENDTIME = "09/01/2014 00:20:00"
