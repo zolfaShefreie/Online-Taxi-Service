@@ -1,5 +1,5 @@
 from kafka import KafkaProducer, KafkaConsumer
-from pyspark.sql.functions import from_json, to_json, struct
+from pyspark.sql.functions import from_json, to_json, struct, col
 import json
 import enum
 
@@ -105,8 +105,9 @@ class BaseBlock:
             .option("subscribe", self.consumer_topic) \
             .option("startingOffsets", "earliest") \
             .load()
-
-        self.consumer_df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
+        self.consumer_df = self.consumer_df.withColumn("data", from_json(col('value').cast('string'),
+                                                                         self._get_value_schema()))\
+            .select('key', 'value', 'data.*', 'timestamp')
         return self.consumer_df
 
     def _spark_output_setup(self, result_df):
@@ -115,21 +116,19 @@ class BaseBlock:
         :param result_df:
         :return:
         """
-        # TODO: check can cast as json? if can't, find solution
         col_list = self._get_value_columns()
-        # result_df['value'] = result_df[col_list].to_dict(orient='records')
-        # result_df.withColumn("value", to_json(struct([x for x in col_list])))\
-        #          .drop(*col_list) \
-        r_df = result_df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)") \
-                 .writeStream \
-                 .format("kafka") \
-                 .option("kafka.bootstrap.servers", self.bootstrap_servers) \
-                 .option("topic", self.producer_topic) \
-                 .option("checkpointLocation", "checkpoint") \
-                    .trigger(processingTime='2 seconds') \
-                    .outputMode("update") \
-            .start().awaitTermination()
-
+        result_df = result_df.withColumn("value", to_json(struct([x for x in col_list])))\
+            .drop(*col_list)
+        query_df = result_df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)") \
+            .writeStream \
+            .format("kafka") \
+            .option("kafka.bootstrap.servers", self.bootstrap_servers) \
+            .option("topic", self.producer_topic) \
+            .option("checkpointLocation", "checkpoint") \
+            .trigger(processingTime='2 seconds') \
+            .outputMode("update") \
+            .start()
+        query_df.awaitTermination()
         # self.spark_session.streams.awaitAnyTermination()
 
     def _normal_setup(self):
