@@ -74,30 +74,39 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
         # TODO:self.cluster_numbers.append(int(consumer_value['Cluster_number']))
 
     def _create_tables(self):
+        """
+        create tables and keyspace
+        :return:
+        """
+        # create keyspace
+        self.session.execute(f"""create  keyspace IF NOT EXISTS {self.KEYSPACE_NAME} """ +
+                             """with replication={'class': 'SimpleStrategy', 'replication_factor': 3}""")
+
+        # create tables
         self.session.execute(
             f"""
-            CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.week_key (week tuple< tuple<date, time>, tuple<date, time> >
+            CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.week_table (week tuple< tuple<date, time>, tuple<date, time> >
             PRIMARY KEY, Lat list<float>, Lon list<float>, Base list<text>, Cluster_number list<int>)
             """
         )
 
         self.session.execute(
             f"""
-            CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.start_coordinates_key (start tuple<float, float>
+            CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.start_coordinates_table (start tuple<float, float>
             PRIMARY KEY, Date list<date>, Time list<time>, Base list<text>, Cluster_number list<int>)
             """
         )
 
         self.session.execute(
             f"""
-            CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.uuid_key (uuid text PRIMARY KEY, Date date, Time time,
+            CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.uuid_table (uuid text PRIMARY KEY, Date date, Time time,
             Lat float, Lon float, Base text, Cluster_number int)
             """
         )
 
         self.session.execute(
             f"""
-            CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.hours_key (hour tuple< tuple<date, time>, tuple<date, time>>
+            CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.hours_table (hour tuple< tuple<date, time>, tuple<date, time>>
             PRIMARY KEY, Lat list<float>, Lon list<float>, Base list<text>, Cluster_number list<int>)
             """
         )
@@ -106,7 +115,7 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
         # check existence of received coordinate
         existence = self.session.execute(
             f"""
-                select * from {self.KEYSPACE_NAME}.start_coordinates_key 
+                select * from {self.KEYSPACE_NAME}.start_coordinates_table 
                 where start = {self.same_start['coordinates'][-1]}
                 """
         )
@@ -115,7 +124,7 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
         if existence:
             self.session.execute(
                 f"""
-                UPDATE {self.KEYSPACE_NAME}.start_coordinates_key
+                UPDATE {self.KEYSPACE_NAME}.start_coordinates_table
                 SET Date = %s, Time = %s, Base = %s, Cluster_number = %s
                 """,
                 ([existence[0].date]+[self.same_start['dates']], [existence[0].time]+[self.same_start['times']],
@@ -126,7 +135,7 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
         # insert in table if not exists
         self.session.execute(
             f"""
-            INSERT INTO {self.KEYSPACE_NAME}.start_coordinates_key (start, Date, Time, Base, Cluster_number)
+            INSERT INTO {self.KEYSPACE_NAME}.start_coordinates_table (start, Date, Time, Base, Cluster_number)
             VALUES (%s, %s, %s, %s, %s)
             """,
             (self.same_start['coordinates'], [self.same_start['dates']], [self.same_start['times']],
@@ -139,7 +148,7 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
     def _insert_uuid(self):
         self.session.execute(
             f"""
-            INSERT INTO {self.KEYSPACE_NAME}.uuid_key (uuid, Date, Time, Lat, Lon, Base, Cluster_number)
+            INSERT INTO {self.KEYSPACE_NAME}.uuid_table (uuid, Date, Time, Lat, Lon, Base, Cluster_number)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
             """,
             (self.unique_uuid['uuids'], self.unique_uuid['dates'], self.unique_uuid['times'],
@@ -153,7 +162,7 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
             # insert in correspond table
             self.session.execute(
                 f"""
-                INSERT INTO {self.KEYSPACE_NAME}.week_key (week, Lat, Lon, Base, Cluster_number)
+                INSERT INTO {self.KEYSPACE_NAME}.week_table (week, Lat, Lon, Base, Cluster_number)
                 VALUES (%s, %s, %s, %s, %s)
                 """,
                 (((self.week_separation['dates'][0], self.week_separation['times'][0]),
@@ -175,7 +184,7 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
             # insert in correspond table
             self.session.execute(
                 f"""
-                INSERT INTO {self.KEYSPACE_NAME}.hours_key (hour, Lat, Lon, Base, Cluster_number)
+                INSERT INTO {self.KEYSPACE_NAME}.hours_table (hour, Lat, Lon, Base, Cluster_number)
                 VALUES (%s, %s, %s, %s, %s)
                 """,
                 (((self.midday_separation['dates'][0], self.midday_separation['times'][0]),
