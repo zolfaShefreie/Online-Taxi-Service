@@ -1,6 +1,9 @@
 from kafka.admin import KafkaAdminClient, NewTopic
 import time
 import threading
+import findspark
+findspark.init()
+from pyspark.sql import SparkSession
 from cassandra.cluster import Cluster
 
 from settings import BOOTSTRAP_SERVERS as setting_bootstrap_server
@@ -14,6 +17,8 @@ class KafkaManagement:
     TOPIC_PARTITION = 1
     TOPIC_REPLICATION = 1
     BOOTSTRAP_SERVERS = setting_bootstrap_server
+    SPARK_SESSION = SparkSession.builder.config("spark.driver.memory", "2g").appName('taxi').getOrCreate()
+    SPARK_SESSION.conf.set("spark.sql.shuffle.partitions", 5)
 
     def __init__(self):
         """
