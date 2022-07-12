@@ -1,6 +1,7 @@
 from kafka.admin import KafkaAdminClient, NewTopic
 import time
 import threading
+from cassandra.cluster import Cluster
 
 from settings import BOOTSTRAP_SERVERS as setting_bootstrap_server
 from blocks.file_stream import FileStreamBlock
@@ -83,6 +84,10 @@ class KafkaManagement:
         self._make_start_block_thread(block=elastic_analyser, key='elastic_analyser')
         
         # cassandra block
+        """# create cluster
+        self.cluster = Cluster()
+        # create session
+        self.session = self.cluster.connect()"""
         cassandra_analyse = CassandraAnalyseBlock(consumer_topic=self.TOPICS[0],
                                                   bootstrap_servers=self.BOOTSTRAP_SERVERS,
                                                   producer_topic=self.TOPICS[3])
