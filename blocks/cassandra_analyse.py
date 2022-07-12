@@ -233,6 +233,8 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
         if self.consumer:
             for each in self.consumer:
                 self._produce_answer(each)
+                self._send_data(data=json.loads(each.value.decode('utf-8')), key=str.encode(each.key.decode("utf-8")),
+                                timestamp_ms=each.timestamp)
         else:
             print("No data in previous phase topic")
 

@@ -23,3 +23,5 @@ ELASTIC_PASSWORD = env("ELASTIC_PASSWORD", default=None)
 
 # variables for cassandra settings
 KEYSPACE_NAME = env("KEYSPACE_NAME", default="TaxiServiceKeyspace")
+CASSANDRA_HOST = "127.0.0.1"
+CASSANDRA_PORT = "7199"
