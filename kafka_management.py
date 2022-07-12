@@ -4,16 +4,17 @@ import threading
 import findspark
 findspark.init()
 from pyspark.sql import SparkSession
-from cassandra.cluster import Cluster
+# from cassandra.cluster import Cluster
 
 from settings import BOOTSTRAP_SERVERS as setting_bootstrap_server
 from blocks.file_stream import FileStreamBlock
 from blocks.elastic_analyse import ElasticAnalyseBlock
 from blocks.cassandra_analyse import CassandraAnalyseBlock
+from blocks.predictor import CountPredictorBlock
 
 
 class KafkaManagement:
-    TOPICS = ['FileDataTopic', 'ClusterTopic', 'ElasticTopic', 'CassandraTopic', ]
+    TOPICS = ['FileDataTopic', 'ClusterTopic', 'ElasticTopic', 'CassandraTopic', 'PredictorTopic']
     TOPIC_PARTITION = 1
     TOPIC_REPLICATION = 1
     BOOTSTRAP_SERVERS = setting_bootstrap_server
@@ -26,6 +27,7 @@ class KafkaManagement:
         """
         self.admin_client = KafkaAdminClient(bootstrap_servers=self.BOOTSTRAP_SERVERS)
         self._delete_topics()
+        time.sleep(5)
         self._create_topics()
         self.threads = dict()
 
@@ -47,9 +49,10 @@ class KafkaManagement:
                 result_messages = self.admin_client.create_topics(new_topics=topic_list, validate_only=False)
                 return result_messages
             except Exception as e:
+                break
                 # suppose exception for existed topic
                 print(e)
-                time.sleep(1)
+                time.sleep(5)
 
     def _delete_topics(self):
         """
@@ -98,6 +101,12 @@ class KafkaManagement:
                                                   producer_topic=self.TOPICS[3])
         # TODO consumer_topic=self.TOPICS[2]
         self._make_start_block_thread(block=cassandra_analyse, key='cassandra_analyse')
+
+        predictor_block = CountPredictorBlock(consumer_topic=self.TOPICS[3],
+                                              bootstrap_servers=self.BOOTSTRAP_SERVERS,
+                                              producer_topic=self.TOPICS[4],
+                                              spark_session=self.SPARK_SESSION)
+        predictor_block.run()
 
         # wait the all threads run
         while True:
