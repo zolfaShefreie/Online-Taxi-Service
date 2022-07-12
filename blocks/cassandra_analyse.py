@@ -80,7 +80,7 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
         """
         # create keyspace
         self.session.execute(f"""create  keyspace IF NOT EXISTS {self.KEYSPACE_NAME} """ +
-                             f"""with replication={'class': 'SimpleStrategy', 'replication_factor': 3}""")
+                             """with replication={'class': 'SimpleStrategy', 'replication_factor': 3}""")
 
         # create tables
         self.session.execute(
