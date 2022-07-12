@@ -4,22 +4,26 @@ import datetime
 from cassandra.cluster import Cluster
 
 from blocks.base_classes import BaseBlock, BlockType
+from settings import KEYSPACE_NAME as setting_keyspace_name
 
 
 class CassandraAnalyseBlock(BaseBlock, ABC):
-    uuids = list()
-    dates = list()
-    times = list()
-    lats = list()
-    lons = list()
-    bases = list()
-    cluster_numbers = list()
-
+    KEYSPACE_NAME = setting_keyspace_name
     DATETIME_FORMAT = "%m/%d/%Y %H:%M:%S"
 
     def __init__(self, *args, **kwargs):
         super().__init__(block_type=BlockType.normal, consumer_group_id=None, *args, **kwargs)
-        self.keyspace_name = 'myKeyspace'
+        self.week_separation = {'uuids': list(), 'dates': list(), 'times': list(), 'coordinates': list(tuple()),
+                                'bases': list(), 'cluster_numbers': list()}
+        self.midday_separation = {'uuids': list(), 'dates': list(), 'times': list(), 'coordinates': list(tuple()),
+                                  'bases': list(), 'cluster_numbers': list()}
+        self.same_start = dict()
+        self.unique_uuid = dict()
+
+        self.next_week = list()
+        self.next_midday = list()
+
+        # should be moved to kafka_management
         # create cluster
         self.cluster = Cluster()
         # create session
@@ -27,193 +31,186 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
         # to automatically cast "insert" statements in the right way for Cassandra
         self.session.encoder.mapping[tuple] = self.session.encoder.cql_encode_tuple
 
-    def _create_tables(self):
-        """
-        create tables
-        :return:
-        """
-        self.session.execute(
-            """
-            CREATE TABLE IF NOT EXISTS myKeyspace.week_key (week tuple< tuple<date, time>, tuple<date, time> >
-            PRIMARY KEY, Lat list<float>, Lon list<float>, Base list<text>, Cluster_number list<int>)
-            """
-        )
-
-        self.session.execute(
-            """
-            CREATE TABLE IF NOT EXISTS myKeyspace.start_coordinates_key (start tuple<float, float> PRIMARY KEY,
-            Date list<date>, Time list<time>, Base list<text>, Cluster_number list<int>)
-            """
-        )
-
-        self.session.execute(
-            """
-            CREATE TABLE IF NOT EXISTS myKeyspace.uuid_key (uuid text PRIMARY KEY, Date date, Time time, Lat float,
-            Lon float, Base text, Cluster_number int)
-            """
-        )
-
-        self.session.execute(
-            """
-            CREATE TABLE IF NOT EXISTS myKeyspace.hours_key (hour tuple< tuple<date, time>, tuple<date, time> >
-            PRIMARY KEY, Lat list<float>, Lon list<float>, Base list<text>, Cluster_number list<int>)
-            """
-        )
-
-    def _insert_table(self, table_type, key, uuids, dates, times, lats, lons, bases, cluster_nums):
-        """
-        insert data in tables
-        :param table_type: which table to insert in
-        :param key: table key
-        :param uuids:
-        :param dates:
-        :param times:
-        :param lats:
-        :param lons:
-        :param bases:
-        :param cluster_nums:
-        :return:
-        """
-        if table_type == 'week':
-            self.session.execute(
-                """
-                INSERT INTO myKeyspace.week_key (week, Lat, Lon, Base, Cluster_number)
-                VALUES (%s, %s, %s, %s, %s)
-                """,
-                (key, lats, lons, bases, cluster_nums)
-            )
-
-        elif table_type == 'start_coordinates':
-            self.session.execute(
-                """
-                INSERT INTO myKeyspace.start_coordinates_key (start, Date, Time, Base, Cluster_number)
-                VALUES (%s, %s, %s, %s, %s)
-                """,
-                (key, dates, times, bases, cluster_nums)
-            )
-
-        elif table_type == 'uuid':
-            self.session.execute(
-                """
-                INSERT INTO myKeyspace.uuid_key (uuid, Date, Time, Lat, Lon, Base, Cluster_number)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """,
-                (key, dates, times, lats, lons, bases, cluster_nums)
-            )
-
-        else:
-            self.session.execute(
-                """
-                INSERT INTO myKeyspace.hours_key (hour, Lat, Lon, Base, Cluster_number)
-                VALUES (%s, %s, %s, %s, %s)
-                """,
-                (key, lats, lons, bases, cluster_nums)
-            )
-
-    def _weekly_key(self):
-        """
-        group data in week intervals
-        :return:
-        """
-        start_date = self.dates[0]
-        end_date = self.dates[-1]
-        interval = datetime.timedelta(days=7)
-
-        periods = list()
-        while start_date < end_date:
-            periods.append(start_date)
-            start_date += interval
-
-        # insert in correspond table
-        for k in range(len(periods)-1):
-            start = self.dates.index(periods[k])
-            end = self.dates.index(periods[k+1])
-            self._insert_table('week', None, None, None,
-                               ((self.dates[start], self.times[start]), (self.dates[end], self.times[end])),
-                               [self.lats[m] for m in range(start, end+1)], [self.lons[m] for m in range(start, end+1)],
-                               [self.bases[m] for m in range(start, end+1)],
-                               [self.cluster_numbers[m] for m in range(start, end+1)])
-
-    def _hours_key(self):
-        """
-        group data in 12 hours intervals
-        :return:
-        """
-        start_time = self.times[0]
-        end_time = self.times[-1]
-        interval = datetime.timedelta(hours=12)
-        periods = list()
-        while start_time < end_time:
-            periods.append(start_time)
-            start_time = (datetime.datetime.combine(datetime.date(1, 1, 1), start_time) + interval).time()
-            # combine() function lifts the start_time to a datetime.datetime object, the interval is then added,
-            # and the result is dropped back down to a datetime.time object.
-
-        # insert in correspond table
-        for k in range(len(periods)-1):
-            start = self.dates.index(periods[k])
-            end = self.dates.index(periods[k+1])
-            self._insert_table('hours', None, None, None,
-                               ((self.dates[start], self.times[start]), (self.dates[end], self.times[end])),
-                               [self.lats[m] for m in range(start, end+1)], [self.lons[m] for m in range(start, end+1)],
-                               [self.bases[m] for m in range(start, end+1)],
-                               [self.cluster_numbers[m] for m in range(start, end+1)])
-
-    def _start_coordinates(self):
-        """
-        group data according to same start coordinations
-        :return:
-        """
-        i = 0
-        matches = list()
-        current_match = list()
-        while i < len(self.lats):
-            current_match.clear()
-            if i not in matches:
-                for index, element in enumerate(self.lats):
-                    if element == self.lats[i] and self.lons[index] == self.lons[i]:
-                        matches.append(index)
-                        current_match.append(index)
-            else:
-                pass
-
-            self._insert_table('start_coordinates', (self.lats[i], self.lons[i]), None,
-                               [self.dates[m] for m in current_match], [self.times[m] for m in current_match], None,
-                               None, [self.bases[m] for m in current_match],
-                               [self.cluster_numbers[m] for m in current_match])
-
-            while i+1 < len(self.lats) and self.lats[i+1] == self.lats[i]:
-                i += 1
-
-            matches.append(-1)
-            i += 1
-
-    def _uuid_key(self):
-        """
-        group data according to uuids
-        :return:
-        """
-        for i in range(len(self.uuids)):
-            self._insert_table('uuid', self.uuids[i], None, self.dates[i], self.times[i], self.lats[i], self.lons[i],
-                               self.bases[i], self.cluster_numbers[i])
-
-    def _produce_answer(self, entry_data):
-        """
-        separate consumer topic data
-        :return:
-        """
+    def _separation(self, entry_data):
         # convert class byte to dictionary
         consumer_value = json.loads(entry_data.value.decode('utf-8'))
 
-        self.uuids.append(entry_data.key.decode("utf-8"))
+        # separate uuid
+        self.week_separation['uuids'].append(entry_data.key.decode("utf-8"))
+        self.midday_separation['uuids'].append(entry_data.key.decode("utf-8"))
+        self.same_start['uuids'] = entry_data.key.decode("utf-8")
+        self.unique_uuid['uuids'] = entry_data.key.decode("utf-8")
+
+        # separate date and time
         date_time = datetime.datetime.strptime(consumer_value['Date/Time'], self.DATETIME_FORMAT)
-        self.dates.append(date_time.date())
-        self.times.append(date_time.time())
-        self.lats.append(float(consumer_value['Lat']))
-        self.lons.append(float(consumer_value['Lon']))
-        self.bases.append(consumer_value['Base'])
-        self.cluster_numbers.append(0)
+        # date
+        self.week_separation['dates'].append(date_time.date())
+        self.midday_separation['dates'].append(date_time.date())
+        self.same_start['dates'] = date_time.date()
+        self.unique_uuid['dates'] = date_time.date()
+        # time
+        self.week_separation['times'].append(date_time.time())
+        self.midday_separation['times'].append(date_time.time())
+        self.same_start['times'] = date_time.time()
+        self.unique_uuid['times'] = date_time.time()
+
+        # separate coordinates
+        self.week_separation['coordinates'].append((float(consumer_value['Lat']), float(consumer_value['Lon'])))
+        self.midday_separation['coordinates'].append((float(consumer_value['Lat']), float(consumer_value['Lon'])))
+        self.same_start['coordinates'] = (float(consumer_value['Lat']), float(consumer_value['Lon']))
+        self.unique_uuid['coordinates'] = (float(consumer_value['Lat']), float(consumer_value['Lon']))
+
+        # separate base
+        self.week_separation['bases'].append(consumer_value['Base'])
+        self.midday_separation['bases'].append(consumer_value['Base'])
+        self.same_start['bases'] = consumer_value['Base']
+        self.unique_uuid['bases'] = consumer_value['Base']
+
+        # separate cluster_number
+        self.week_separation['cluster_numbers'].append(0)
+        self.midday_separation['cluster_numbers'].append(0)
+        self.same_start['cluster_numbers'] = 0
+        self.unique_uuid['cluster_numbers'] = 0
         # TODO:self.cluster_numbers.append(int(consumer_value['Cluster_number']))
+
+    def _create_tables(self):
+        self.session.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.week_key (week tuple< tuple<date, time>, tuple<date, time> >
+            PRIMARY KEY, Lat list<float>, Lon list<float>, Base list<text>, Cluster_number list<int>)
+            """
+        )
+
+        self.session.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.start_coordinates_key (start tuple<float, float>
+            PRIMARY KEY, Date list<date>, Time list<time>, Base list<text>, Cluster_number list<int>)
+            """
+        )
+
+        self.session.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.uuid_key (uuid text PRIMARY KEY, Date date, Time time,
+            Lat float, Lon float, Base text, Cluster_number int)
+            """
+        )
+
+        self.session.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.hours_key (hour tuple< tuple<date, time>, tuple<date, time>>
+            PRIMARY KEY, Lat list<float>, Lon list<float>, Base list<text>, Cluster_number list<int>)
+            """
+        )
+
+    def _insert_same_coordinates(self):
+        # check existence of received coordinate
+        existence = self.session.execute(
+            f"""
+                select * from {self.KEYSPACE_NAME}.start_coordinates_key 
+                where start = {self.same_start['coordinates'][-1]}
+                """
+        )
+
+        # update correspond record if exists
+        if existence:
+            self.session.execute(
+                f"""
+                UPDATE {self.KEYSPACE_NAME}.start_coordinates_key
+                SET Date = %s, Time = %s, Base = %s, Cluster_number = %s
+                """,
+                ([existence[0].date]+[self.same_start['dates']], [existence[0].time]+[self.same_start['times']],
+                 [existence[0].base]+[self.same_start['bases']],
+                 [existence[0].cluster_number]+[self.same_start['cluster_numbers']])
+            )
+
+        # insert in table if not exists
+        self.session.execute(
+            f"""
+            INSERT INTO {self.KEYSPACE_NAME}.start_coordinates_key (start, Date, Time, Base, Cluster_number)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (self.same_start['coordinates'], [self.same_start['dates']], [self.same_start['times']],
+             [self.same_start['bases']], [self.same_start['cluster_numbers']])
+        )
+
+        # delete inserted data
+        self.same_start.clear()
+
+    def _insert_uuid(self):
+        self.session.execute(
+            f"""
+            INSERT INTO {self.KEYSPACE_NAME}.uuid_key (uuid, Date, Time, Lat, Lon, Base, Cluster_number)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """,
+            (self.unique_uuid['uuids'], self.unique_uuid['dates'], self.unique_uuid['times'],
+             self.unique_uuid['coordinates'][0], self.unique_uuid['coordinates'][1], self.unique_uuid['bases'],
+             self.unique_uuid['cluster_numbers'])
+        )
+
+    def _check_intervals(self):
+        # check weekly key
+        if self.week_separation['dates'][-1] in self.next_week:
+            # insert in correspond table
+            self.session.execute(
+                f"""
+                INSERT INTO {self.KEYSPACE_NAME}.week_key (week, Lat, Lon, Base, Cluster_number)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (((self.week_separation['dates'][0], self.week_separation['times'][0]),
+                  (self.week_separation['dates'][-1], self.week_separation['times'][-1])),
+                 [i[0] for i in self.midday_separation['coordinates']],
+                 [i[1] for i in self.midday_separation['coordinates']],
+                 self.week_separation['bases'], self.week_separation['cluster_numbers'])
+            )
+
+            # delete inserted data from lists
+            current = self.week_separation['dates'][0]
+            while self.week_separation['dates'][0] == current:
+                for v in self.week_separation.values():
+                    v.pop(0)
+            self.next_week.pop(0)
+
+        # check midday key
+        elif self.midday_separation['times'][-1] in self.next_midday:
+            # insert in correspond table
+            self.session.execute(
+                f"""
+                INSERT INTO {self.KEYSPACE_NAME}.hours_key (hour, Lat, Lon, Base, Cluster_number)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (((self.midday_separation['dates'][0], self.midday_separation['times'][0]),
+                  (self.midday_separation['dates'][-1], self.midday_separation['times'][-1])),
+                 [i[0] for i in self.midday_separation['coordinates']],
+                 [i[1] for i in self.midday_separation['coordinates']],
+                 self.midday_separation['bases'], self.midday_separation['cluster_numbers'])
+            )
+
+            # delete inserted data from lists
+            current = self.midday_separation['times'][0]
+            while self.midday_separation['dates'][0] == current:
+                for v in self.midday_separation.values():
+                    v.pop(0)
+            self.next_midday.pop(0)
+
+        else:
+            next_w = self.week_separation['dates'][-1] + datetime.timedelta(days=7)
+            if next_w not in self.next_week:
+                self.next_week.append(next_w)
+            next_t = (datetime.datetime.combine(datetime.date(1, 1, 1), self.midday_separation['times'][-1]) +
+                      datetime.timedelta(hours=12)).time()
+            if next_t not in self.next_midday:
+                self.next_midday.append(next_t)
+
+        self._insert_same_coordinates()
+        self._insert_uuid()
+
+    def _produce_answer(self, entry_data):
+        """
+        separate consumer topic data and group data
+        :return:
+        """
+        self._separation(entry_data=entry_data)
+        self._check_intervals()
 
     def _normal_run(self):
         """
@@ -229,11 +226,6 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
                 self._produce_answer(each)
         else:
             print("No data in previous phase topic")
-
-        self._weekly_key()
-        self._hours_key()
-        self._start_coordinates()
-        self._uuid_key()
 
         # close connection
         self.session.shutdown()
