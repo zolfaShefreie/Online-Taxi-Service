@@ -74,6 +74,15 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
         # TODO:self.cluster_numbers.append(int(consumer_value['Cluster_number']))
 
     def _create_tables(self):
+        """
+        create tables and keyspace
+        :return:
+        """
+        # create keyspace
+        self.session.execute(f"""create  keyspace IF NOT EXISTS {self.KEYSPACE_NAME} """ +
+                             f"""with replication={'class': 'SimpleStrategy', 'replication_factor': 3}""")
+
+        # create tables
         self.session.execute(
             f"""
             CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.week_table (week tuple< tuple<date, time>, tuple<date, time> >
