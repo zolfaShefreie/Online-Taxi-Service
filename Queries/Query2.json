@@ -1,0 +1,31 @@
+{
+    "aggs": {
+        "filter_date":{
+            "filter":{
+                "range":{
+                    "Date/Time": {
+                        "gte": "09/01/2014 00:01:00",
+                        "lte": "09/01/2014 00:20:00"
+                    }
+                    
+                }
+            },
+            "aggs": {
+                "geo":{
+                    "geohash_grid": {
+                        "field": "Location",
+                        "precision":7,
+                        "size":10
+                    },
+                    "aggs": {
+                        "point": {
+                            "geo_centroid": {
+                                "field": "Location"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

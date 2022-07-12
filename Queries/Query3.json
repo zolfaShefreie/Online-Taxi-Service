@@ -1,0 +1,13 @@
+{
+    "size": 100, 
+    "query": {
+      "match_all": {}
+    },
+    "sort": [
+      {
+        "Date/Time": {
+          "order": "desc"
+        }
+      }
+    ]
+  }

@@ -1,7 +1,11 @@
 from abc import ABC
+from ast import Return
 import json
+from typing import final
+from unittest import result
 from elasticsearch import Elasticsearch
 import datetime
+import uuid
 
 from blocks.base_classes import BaseBlock, BlockType
 from settings import ELASTIC_SERVER, ELASTIC_PASSWORD
@@ -42,6 +46,7 @@ class ElasticAnalyseBlock(BaseBlock, ABC):
         :param data_id: document id
         :return:
         """
+
         # convert class byte to dictionary
         consumer_value = json.loads(entry_data.value.decode('utf-8'))
 
@@ -61,6 +66,11 @@ class ElasticAnalyseBlock(BaseBlock, ABC):
                 }
             })
 
+        key = str.encode(entry_data.key.decode("utf-8"))
+        timestamp = entry_data.timestamp
+        return consumer_value, key, timestamp
+        
+
     def _normal_run(self):
         """
         run method for normal type
@@ -70,11 +80,14 @@ class ElasticAnalyseBlock(BaseBlock, ABC):
         self._generate_index()
         self._normal_setup()
         data_id = 0
+ 
         if self.consumer:
             for each in self.consumer:
-                self._produce_answer(each, data_id=data_id)
+                produced_data, key, timestamp = self._produce_answer(each, data_id=data_id)
                 data_id += 1
-                #self._send_data(result)
+                self._send_data(data=produced_data, key=key, timestamp_ms=timestamp)
 
         else:
             print("No data in previous phase topic")
+
+
