@@ -20,3 +20,6 @@ if (RAW_DATA_PATH is None and not os.path.exists(SORTED_DATA_PATH)) or \
 # variables for elasticsearch settings
 ELASTIC_SERVER = env("ELASTIC_SERVER", default="http://localhost:9200/")
 ELASTIC_PASSWORD = env("ELASTIC_PASSWORD", default=None)
+
+# variables for cassandra settings
+KEYSPACE_NAME = env("KEYSPACE_NAME", default=None)
