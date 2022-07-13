@@ -100,7 +100,7 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
         self.session.execute(
             f"""
             CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.uuid_table (uuid text PRIMARY KEY, Date date, Time time,
-            Lat float, Lon float, Base text, Cluster_number int, str_date_ime tuple<text, text>)
+            Lat float, Lon float, Base text, Cluster_number int, str_date_ime text)
             """
         )
 
@@ -153,8 +153,7 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
             """,
             (self.unique_uuid['uuids'], self.unique_uuid['dates'], self.unique_uuid['times'],
              self.unique_uuid['coordinates'][0], self.unique_uuid['coordinates'][1], self.unique_uuid['bases'],
-             self.unique_uuid['cluster_numbers'],
-             (str(self.unique_uuid['dates'])+' '+str(self.unique_uuid['times'])))
+             self.unique_uuid['cluster_numbers'], str(self.unique_uuid['dates'])+' '+str(self.unique_uuid['times']))
         )
 
     def _check_intervals(self):
