@@ -250,7 +250,7 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
 
         else:
             next_w = self.week_separation['dates'][-1] + datetime.timedelta(days=7)
-            next_w.strftime(self.DATETIME_FORMAT.split()[0])
+            next_w = next_w.strftime(self.DATETIME_FORMAT.split()[0])
             if next_w not in self.next_week:
                 self.next_week.append(next_w)
             
@@ -260,7 +260,7 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
                 self.next_midday.append(next_t)
                 
             next_m = self.month_separation['dates'][-1] + datetime.timedelta(days=30)
-            next_m.strftime(self.DATETIME_FORMAT.split()[0])
+            next_m = next_m.strftime(self.DATETIME_FORMAT.split()[0])
             if next_m not in self.next_month:
                 self.next_month.append(next_m)
 
