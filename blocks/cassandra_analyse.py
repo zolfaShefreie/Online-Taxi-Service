@@ -95,7 +95,8 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
         self.session.execute(
             f"""
             CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.week_table (week tuple< tuple<date, time>, tuple<date, time> >
-            PRIMARY KEY, Lat list<float>, Lon list<float>, Base list<text>, Cluster_number list<int>)
+            PRIMARY KEY, Lat list<float>, Lon list<float>, Base list<text>, Cluster_number list<int>,
+            str_week tuple<text, text>)
             """
         )
 
@@ -116,14 +117,16 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
         self.session.execute(
             f"""
             CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.hours_table (hour tuple< tuple<date, time>, tuple<date, time>>
-            PRIMARY KEY, Lat list<float>, Lon list<float>, Base list<text>, Cluster_number list<int>)
+            PRIMARY KEY, Lat list<float>, Lon list<float>, Base list<text>, Cluster_number list<int>,
+            str_hour tuple<text, text>)
             """
         )
         
         self.session.execute(
             f"""
             CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.month_table (month tuple<tuple<date, time>, tuple<date,time>>
-            PRIMARY KEY, Lat list<float>, Lon list<float>, Base list<text>, Cluster_number list<int>)
+            PRIMARY KEY, Lat list<float>, Lon list<float>, Base list<text>, Cluster_number list<int>,
+            str_month tuple<text, text>)
             """
         )
 
@@ -178,14 +181,16 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
             # insert in correspond table
             self.session.execute(
                 f"""
-                INSERT INTO {self.KEYSPACE_NAME}.week_table (week, Lat, Lon, Base, Cluster_number)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO {self.KEYSPACE_NAME}.week_table (week, Lat, Lon, Base, Cluster_number, str_week)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 (((self.week_separation['dates'][0], self.week_separation['times'][0]),
                   (self.week_separation['dates'][-1], self.week_separation['times'][-1])),
                  [i[0] for i in self.midday_separation['coordinates']],
                  [i[1] for i in self.midday_separation['coordinates']],
-                 self.week_separation['bases'], self.week_separation['cluster_numbers'])
+                 self.week_separation['bases'], self.week_separation['cluster_numbers'],
+                 (self.week_separation['dates'][0].toString()+self.week_separation['times'][0].toString(),
+                  self.week_separation['dates'][-1].toString()+self.week_separation['times'][-1].toString()))
             )
 
             # delete inserted data from lists
@@ -200,14 +205,16 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
             # insert in correspond table
             self.session.execute(
                 f"""
-                INSERT INTO {self.KEYSPACE_NAME}.hours_table (hour, Lat, Lon, Base, Cluster_number)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO {self.KEYSPACE_NAME}.hours_table (hour, Lat, Lon, Base, Cluster_number, str_hour)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 (((self.midday_separation['dates'][0], self.midday_separation['times'][0]),
                   (self.midday_separation['dates'][-1], self.midday_separation['times'][-1])),
                  [i[0] for i in self.midday_separation['coordinates']],
                  [i[1] for i in self.midday_separation['coordinates']],
-                 self.midday_separation['bases'], self.midday_separation['cluster_numbers'])
+                 self.midday_separation['bases'], self.midday_separation['cluster_numbers'],
+                 (self.midday_separation['dates'][0].toString()+self.midday_separation['times'][0].toString(),
+                  self.midday_separation['dates'][-1].toString()+self.midday_separation['times'][-1].toString()))
             )
 
             # delete inserted data from lists
@@ -222,14 +229,16 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
             # insert in correspond table
             self.session.execute(
                 f"""
-                INSERT INTO {self.KEYSPACE_NAME}.month_table (month, Lat, Lon, Base, Cluster_number)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO {self.KEYSPACE_NAME}.month_table (month, Lat, Lon, Base, Cluster_number, str_month)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 (((self.month_separation['dates'][0], self.month_separation['times'][0]),
                   (self.month_separation['dates'][-1], self.month_separation['times'][-1])),
                  [i[0] for i in self.month_separation['coordinates']],
                  [i[1] for i in self.month_separation['coordinates']],
-                 self.month_separation['bases'], self.month_separation['cluster_numbers'])
+                 self.month_separation['bases'], self.month_separation['cluster_numbers'],
+                 (self.month_separation['dates'][0].toString()+self.month_separation['times'][0].toString(),
+                  self.month_separation['dates'][-1].toString()+self.month_separation['times'][-1].toString()))
             )
 
             # delete inserted data from lists
