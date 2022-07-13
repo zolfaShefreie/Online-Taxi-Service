@@ -189,8 +189,8 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
                  [i[0] for i in self.midday_separation['coordinates']],
                  [i[1] for i in self.midday_separation['coordinates']],
                  self.week_separation['bases'], self.week_separation['cluster_numbers'],
-                 (str(self.week_separation['dates'][0])+str(self.week_separation['times'][0]),
-                  str(self.week_separation['dates'][-1])+str(self.week_separation['times'][-1])))
+                 (str(self.week_separation['dates'][0])+' '+str(self.week_separation['times'][0]),
+                  str(self.week_separation['dates'][-1])+' '+str(self.week_separation['times'][-1])))
             )
 
             # delete inserted data from lists
@@ -213,8 +213,8 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
                  [i[0] for i in self.midday_separation['coordinates']],
                  [i[1] for i in self.midday_separation['coordinates']],
                  self.midday_separation['bases'], self.midday_separation['cluster_numbers'],
-                 (str(self.midday_separation['dates'][0])+str(self.midday_separation['times'][0]),
-                  str(self.midday_separation['dates'][-1])+str(self.midday_separation['times'][-1])))
+                 (str(self.midday_separation['dates'][0])+' '+str(self.midday_separation['times'][0]),
+                  str(self.midday_separation['dates'][-1])+' '+str(self.midday_separation['times'][-1])))
             )
 
             # delete inserted data from lists
@@ -237,8 +237,8 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
                  [i[0] for i in self.month_separation['coordinates']],
                  [i[1] for i in self.month_separation['coordinates']],
                  self.month_separation['bases'], self.month_separation['cluster_numbers'],
-                 (str(self.month_separation['dates'][0])+str(self.month_separation['times'][0]),
-                  str(self.month_separation['dates'][-1])+str(self.month_separation['times'][-1])))
+                 (str(self.month_separation['dates'][0])+' '+str(self.month_separation['times'][0]),
+                  str(self.month_separation['dates'][-1])+' '+str(self.month_separation['times'][-1])))
             )
 
             # delete inserted data from lists
