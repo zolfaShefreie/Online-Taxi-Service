@@ -17,14 +17,11 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
                                 'bases': list(), 'cluster_numbers': list()}
         self.midday_separation = {'uuids': list(), 'dates': list(), 'times': list(), 'coordinates': list(tuple()),
                                   'bases': list(), 'cluster_numbers': list()}
-        self.month_separation = {'uuids': list(), 'dates': list(), 'times': list(), 'coordinates': list(tuple()),
-                                 'bases': list(), 'cluster_numbers': list()}
         self.same_start = dict()
         self.unique_uuid = dict()
 
         self.next_week = list()
         self.next_midday = list()
-        self.next_month = list()
 
         # should be moved to kafka_management
         # create cluster
@@ -41,7 +38,6 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
         # separate uuid
         self.week_separation['uuids'].append(entry_data.key.decode("utf-8"))
         self.midday_separation['uuids'].append(entry_data.key.decode("utf-8"))
-        self.month_separation['uuids'].append(entry_data.key.decode("utf-8"))
         self.same_start['uuids'] = entry_data.key.decode("utf-8")
         self.unique_uuid['uuids'] = entry_data.key.decode("utf-8")
 
@@ -50,34 +46,29 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
         # date
         self.week_separation['dates'].append(date_time.date())
         self.midday_separation['dates'].append(date_time.date())
-        self.month_separation['dates'].append(date_time.date())
         self.same_start['dates'] = date_time.date()
         self.unique_uuid['dates'] = date_time.date()
         # time
         self.week_separation['times'].append(date_time.time())
         self.midday_separation['times'].append(date_time.time())
-        self.month_separation['times'].append(datetime.time())
         self.same_start['times'] = date_time.time()
         self.unique_uuid['times'] = date_time.time()
 
         # separate coordinates
         self.week_separation['coordinates'].append((float(consumer_value['Lat']), float(consumer_value['Lon'])))
         self.midday_separation['coordinates'].append((float(consumer_value['Lat']), float(consumer_value['Lon'])))
-        self.month_separation['coordinates'].append((float(consumer_value['Lat']), float(consumer_value['Lon'])))
         self.same_start['coordinates'] = (float(consumer_value['Lat']), float(consumer_value['Lon']))
         self.unique_uuid['coordinates'] = (float(consumer_value['Lat']), float(consumer_value['Lon']))
 
         # separate base
         self.week_separation['bases'].append(consumer_value['Base'])
         self.midday_separation['bases'].append(consumer_value['Base'])
-        self.month_separation['bases'].append(consumer_value['Base'])
         self.same_start['bases'] = consumer_value['Base']
         self.unique_uuid['bases'] = consumer_value['Base']
 
         # separate cluster_number
         self.week_separation['cluster_numbers'].append(0)
         self.midday_separation['cluster_numbers'].append(0)
-        self.month_separation['cluster_numbers'].append(0)
         self.same_start['cluster_numbers'] = 0
         self.unique_uuid['cluster_numbers'] = 0
         # TODO:self.cluster_numbers.append(int(consumer_value['Cluster_number']))
@@ -95,8 +86,7 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
         self.session.execute(
             f"""
             CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.week_table (week tuple< tuple<date, time>, tuple<date, time> >
-            PRIMARY KEY, Lat list<float>, Lon list<float>, Base list<text>, Cluster_number list<int>,
-            str_week tuple<text, text>)
+            PRIMARY KEY, Lat list<float>, Lon list<float>, Base list<text>, Cluster_number list<int>)
             """
         )
 
@@ -110,23 +100,14 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
         self.session.execute(
             f"""
             CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.uuid_table (uuid text PRIMARY KEY, Date date, Time time,
-            Lat float, Lon float, Base text, Cluster_number int)
+            Lat float, Lon float, Base text, Cluster_number int, str_date_ime tuple<text, text>)
             """
         )
 
         self.session.execute(
             f"""
             CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.hours_table (hour tuple< tuple<date, time>, tuple<date, time>>
-            PRIMARY KEY, Lat list<float>, Lon list<float>, Base list<text>, Cluster_number list<int>,
-            str_hour tuple<text, text>)
-            """
-        )
-        
-        self.session.execute(
-            f"""
-            CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.month_table (month tuple<tuple<date, time>, tuple<date,time>>
-            PRIMARY KEY, Lat list<float>, Lon list<float>, Base list<text>, Cluster_number list<int>,
-            str_month tuple<text, text>)
+            PRIMARY KEY, Lat list<float>, Lon list<float>, Base list<text>, Cluster_number list<int>)
             """
         )
 
@@ -167,12 +148,13 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
     def _insert_uuid(self):
         self.session.execute(
             f"""
-            INSERT INTO {self.KEYSPACE_NAME}.uuid_table (uuid, Date, Time, Lat, Lon, Base, Cluster_number)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO {self.KEYSPACE_NAME}.uuid_table (uuid, Date, Time, Lat, Lon, Base, Cluster_number, str_date_ime)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (self.unique_uuid['uuids'], self.unique_uuid['dates'], self.unique_uuid['times'],
              self.unique_uuid['coordinates'][0], self.unique_uuid['coordinates'][1], self.unique_uuid['bases'],
-             self.unique_uuid['cluster_numbers'])
+             self.unique_uuid['cluster_numbers'],
+             (str(self.unique_uuid['dates'])+' '+str(self.unique_uuid['times'])))
         )
 
     def _check_intervals(self):
@@ -181,16 +163,14 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
             # insert in correspond table
             self.session.execute(
                 f"""
-                INSERT INTO {self.KEYSPACE_NAME}.week_table (week, Lat, Lon, Base, Cluster_number, str_week)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO {self.KEYSPACE_NAME}.week_table (week, Lat, Lon, Base, Cluster_number)
+                VALUES (%s, %s, %s, %s, %s)
                 """,
                 (((self.week_separation['dates'][0], self.week_separation['times'][0]),
                   (self.week_separation['dates'][-1], self.week_separation['times'][-1])),
                  [i[0] for i in self.midday_separation['coordinates']],
                  [i[1] for i in self.midday_separation['coordinates']],
-                 self.week_separation['bases'], self.week_separation['cluster_numbers'],
-                 (str(self.week_separation['dates'][0])+str(self.week_separation['times'][0]),
-                  str(self.week_separation['dates'][-1])+str(self.week_separation['times'][-1])))
+                 self.week_separation['bases'], self.week_separation['cluster_numbers'])
             )
 
             # delete inserted data from lists
@@ -205,16 +185,14 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
             # insert in correspond table
             self.session.execute(
                 f"""
-                INSERT INTO {self.KEYSPACE_NAME}.hours_table (hour, Lat, Lon, Base, Cluster_number, str_hour)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO {self.KEYSPACE_NAME}.hours_table (hour, Lat, Lon, Base, Cluster_number)
+                VALUES (%s, %s, %s, %s, %s)
                 """,
                 (((self.midday_separation['dates'][0], self.midday_separation['times'][0]),
                   (self.midday_separation['dates'][-1], self.midday_separation['times'][-1])),
                  [i[0] for i in self.midday_separation['coordinates']],
                  [i[1] for i in self.midday_separation['coordinates']],
-                 self.midday_separation['bases'], self.midday_separation['cluster_numbers'],
-                 (str(self.midday_separation['dates'][0])+str(self.midday_separation['times'][0]),
-                  str(self.midday_separation['dates'][-1])+str(self.midday_separation['times'][-1])))
+                 self.midday_separation['bases'], self.midday_separation['cluster_numbers'])
             )
 
             # delete inserted data from lists
@@ -223,31 +201,7 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
                 for v in self.midday_separation.values():
                     v.pop(0)
             self.next_midday.pop(0)
-            
-        # check monthly key
-        elif self.month_separation['dates'][-1] in self.next_month:
-            # insert in correspond table
-            self.session.execute(
-                f"""
-                INSERT INTO {self.KEYSPACE_NAME}.month_table (month, Lat, Lon, Base, Cluster_number, str_month)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                """,
-                (((self.month_separation['dates'][0], self.month_separation['times'][0]),
-                  (self.month_separation['dates'][-1], self.month_separation['times'][-1])),
-                 [i[0] for i in self.month_separation['coordinates']],
-                 [i[1] for i in self.month_separation['coordinates']],
-                 self.month_separation['bases'], self.month_separation['cluster_numbers'],
-                 (str(self.month_separation['dates'][0])+str(self.month_separation['times'][0]),
-                  str(self.month_separation['dates'][-1])+str(self.month_separation['times'][-1])))
-            )
-
-            # delete inserted data from lists
-            current = self.month_separation['dates'][0]
-            while self.month_separation['dates'][0] == current:
-                for v in self.month_separation.values():
-                    v.pop(0)
-            self.next_month.pop(0)
-
+   
         else:
             next_w = self.week_separation['dates'][-1] + datetime.timedelta(days=7)
             next_w = next_w.strftime(self.DATETIME_FORMAT.split()[0])
@@ -257,12 +211,7 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
             next_t = (datetime.datetime.combine(datetime.date(1, 1, 1), self.midday_separation['times'][-1]) +
                       datetime.timedelta(hours=12)).time()
             if next_t not in self.next_midday:
-                self.next_midday.append(next_t)
-                
-            next_m = self.month_separation['dates'][-1] + datetime.timedelta(days=30)
-            next_m = next_m.strftime(self.DATETIME_FORMAT.split()[0])
-            if next_m not in self.next_month:
-                self.next_month.append(next_m)
+                self.next_midday.append(next_t)                
 
         self._insert_same_coordinates()
         self._insert_uuid()
