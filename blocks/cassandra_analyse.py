@@ -189,8 +189,8 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
                  [i[0] for i in self.midday_separation['coordinates']],
                  [i[1] for i in self.midday_separation['coordinates']],
                  self.week_separation['bases'], self.week_separation['cluster_numbers'],
-                 (self.week_separation['dates'][0].toString()+self.week_separation['times'][0].toString(),
-                  self.week_separation['dates'][-1].toString()+self.week_separation['times'][-1].toString()))
+                 (str(self.week_separation['dates'][0])+str(self.week_separation['times'][0]),
+                  str(self.week_separation['dates'][-1])+str(self.week_separation['times'][-1])))
             )
 
             # delete inserted data from lists
@@ -213,8 +213,8 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
                  [i[0] for i in self.midday_separation['coordinates']],
                  [i[1] for i in self.midday_separation['coordinates']],
                  self.midday_separation['bases'], self.midday_separation['cluster_numbers'],
-                 (self.midday_separation['dates'][0].toString()+self.midday_separation['times'][0].toString(),
-                  self.midday_separation['dates'][-1].toString()+self.midday_separation['times'][-1].toString()))
+                 (str(self.midday_separation['dates'][0])+str(self.midday_separation['times'][0]),
+                  str(self.midday_separation['dates'][-1])+str(self.midday_separation['times'][-1])))
             )
 
             # delete inserted data from lists
@@ -237,8 +237,8 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
                  [i[0] for i in self.month_separation['coordinates']],
                  [i[1] for i in self.month_separation['coordinates']],
                  self.month_separation['bases'], self.month_separation['cluster_numbers'],
-                 (self.month_separation['dates'][0].toString()+self.month_separation['times'][0].toString(),
-                  self.month_separation['dates'][-1].toString()+self.month_separation['times'][-1].toString()))
+                 (str(self.month_separation['dates'][0])+str(self.month_separation['times'][0]),
+                  str(self.month_separation['dates'][-1])+str(self.month_separation['times'][-1])))
             )
 
             # delete inserted data from lists
@@ -250,6 +250,7 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
 
         else:
             next_w = self.week_separation['dates'][-1] + datetime.timedelta(days=7)
+            next_w.strftime(self.DATETIME_FORMAT.split()[0])
             if next_w not in self.next_week:
                 self.next_week.append(next_w)
             
@@ -259,6 +260,7 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
                 self.next_midday.append(next_t)
                 
             next_m = self.month_separation['dates'][-1] + datetime.timedelta(days=30)
+            next_m.strftime(self.DATETIME_FORMAT.split()[0])
             if next_m not in self.next_month:
                 self.next_month.append(next_m)
 
