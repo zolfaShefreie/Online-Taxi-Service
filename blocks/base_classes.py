@@ -102,6 +102,7 @@ class BaseBlock:
             .option("kafka.bootstrap.servers", self.bootstrap_servers) \
             .option("subscribe", self.consumer_topic) \
             .option("startingOffsets", "earliest") \
+            .option("failOnDataLoss", "false") \
             .load()
         self.consumer_df = self.consumer_df.withColumn("data", from_json(col('value').cast('string'),
                                                                          self._get_value_schema()))\

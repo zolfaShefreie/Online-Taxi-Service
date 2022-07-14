@@ -16,7 +16,7 @@ from settings import SAVED_TRANSFORMERS_PATH
 class PreTrainedClusteringBlock(BaseBlock, ABC):
     CLUSTER_NUM = 7
     SAVED_MODEL_PATH = SAVED_TRANSFORMERS_PATH + "/" + "kmeans_model"
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(block_type=BlockType.spark, *args, **kwargs)
         # self.cluster_model = StreamingKMeans(k=self.CLUSTER_NUM, timeUnit='points').setRandomCenters(5, 100.0, 42)
@@ -64,4 +64,3 @@ class PreTrainedClusteringBlock(BaseBlock, ABC):
         result_df = self._produce_answer(df)
         result_df = result_df.withColumn("Cluster", col("prediction"))
         self._spark_output_setup(result_df)
-
