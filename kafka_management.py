@@ -7,7 +7,7 @@ from pyspark.sql import SparkSession
 
 from settings import BOOTSTRAP_SERVERS as setting_bootstrap_server
 from blocks.file_stream import FileStreamBlock
-from blocks.online_cluster import OnlineClusteringBlock
+from blocks.online_cluster import PreTrainedClusteringBlock
 
 
 class KafkaManagement:
@@ -24,6 +24,7 @@ class KafkaManagement:
         """
         self.admin_client = KafkaAdminClient(bootstrap_servers=self.BOOTSTRAP_SERVERS)
         self._delete_topics()
+        time.sleep(5)
         self._create_topics()
         self.threads = dict()
 
@@ -48,6 +49,7 @@ class KafkaManagement:
                 # suppose exception for existed topic
                 print(e)
                 time.sleep(1)
+                break
 
     def _delete_topics(self):
         """
@@ -80,9 +82,11 @@ class KafkaManagement:
         file_streamer = FileStreamBlock(bootstrap_servers=self.BOOTSTRAP_SERVERS, producer_topic=self.TOPICS[0])
         self._make_start_block_thread(block=file_streamer, key='file_streamer')
 
-        online_cluster = OnlineClusteringBlock(bootstrap_servers=self.BOOTSTRAP_SERVERS, producer_topic=self.TOPICS[1],
-                                               consumer_topic=self.TOPICS[0], spark_session=self.SPARK_SESSION)
-        online_cluster.run()
+        pre_trained_cluster = PreTrainedClusteringBlock(bootstrap_servers=self.BOOTSTRAP_SERVERS,
+                                                        producer_topic=self.TOPICS[1],
+                                                        consumer_topic=self.TOPICS[0],
+                                                        spark_session=self.SPARK_SESSION)
+        self._make_start_block_thread(block=pre_trained_cluster, key='pre_trained_cluster')
 
         # wait the all threads run
         while True:

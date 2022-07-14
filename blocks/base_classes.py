@@ -100,8 +100,6 @@ class BaseBlock:
 
         self.consumer_df = self.spark_session.readStream.format("kafka") \
             .option("kafka.bootstrap.servers", self.bootstrap_servers) \
-            .option("kafka.max.poll.records", 10) \
-            .option("maxOffsetsPerTrigger", 10) \
             .option("subscribe", self.consumer_topic) \
             .option("startingOffsets", "earliest") \
             .load()
@@ -125,8 +123,6 @@ class BaseBlock:
             .option("kafka.bootstrap.servers", self.bootstrap_servers) \
             .option("topic", self.producer_topic) \
             .option("checkpointLocation", "checkpoint") \
-            .trigger(processingTime='2 seconds') \
-            .outputMode("update") \
             .start()
         query_df.awaitTermination()
         # self.spark_session.streams.awaitAnyTermination()
