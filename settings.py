@@ -17,4 +17,4 @@ if (RAW_DATA_PATH is None and not os.path.exists(SORTED_DATA_PATH)) or \
         (RAW_DATA_PATH is not None and not os.path.exists(RAW_DATA_PATH) and not os.path.exists(SORTED_DATA_PATH)):
     raise Exception("GET NO DATA_PATH")
 
-SAVED_TRANSFORMERS_PATH = "./saved_transformers"
+SAVED_TRANSFORMERS_PATH = os.path.abspath("saved_transformers").replace("\\", "/")

@@ -15,7 +15,7 @@ from settings import SAVED_TRANSFORMERS_PATH
 
 class PreTrainedClusteringBlock(BaseBlock, ABC):
     CLUSTER_NUM = 7
-    SAVED_MODEL_PATH = SAVED_TRANSFORMERS_PATH + "/" + "kmeans_model"
+    SAVED_MODEL_PATH = SAVED_TRANSFORMERS_PATH + "/" + "kmeans_model_11"
 
     def __init__(self, *args, **kwargs):
         super().__init__(block_type=BlockType.spark, *args, **kwargs)
