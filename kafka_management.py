@@ -107,7 +107,7 @@ class KafkaManagement:
                                   bootstrap_servers=self.BOOTSTRAP_SERVERS,
                                   producer_topic=self.TOPICS[-1],
                                   spark_session=self.SPARK_SESSION)
-        page_rank.run()
+        self._make_start_block_thread(block=page_rank, key='page_rank')
 
         # wait the all threads run
         while True:
