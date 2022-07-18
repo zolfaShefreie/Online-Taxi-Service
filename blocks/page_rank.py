@@ -1,6 +1,8 @@
 from abc import ABC
 from graphframes import GraphFrame
 import json
+from pyspark.sql.functions import monotonically_increasing_id
+import pyspark.sql.functions as F
 
 from blocks.base_classes import BaseBlock, BlockType
 
@@ -12,43 +14,46 @@ class PageRankBlock(BaseBlock, ABC):
 
     def __init__(self, *args, **kwargs):
         super().__init__(block_type=BlockType.normal, consumer_group_id=None, *args, **kwargs)
-        self.start_data_id = None
-        self.end_data_id = None
+        self.is_even_data = True
+        self.all_data = None
         self.vertices = None
-        self.edges = None
 
-    def _set_edges(self, data_id):
+    def _create_edges(self):
         """
-        set request_id as start_data_id or end_data_id and add edges
-        :param data_id:
-        :return:
+        split data and make edge
+        :return: edge dataframe
         """
-        self.start_data_id = data_id if self.start_data_id is None else self.start_data_id
-        self.end_data_id = data_id if (self.start_data_id is not None) and \
-                                      (self.end_data_id is None) else self.end_data_id
+        if self.is_even_data:
+            count = self.all_data.count()
+            first_data = self.all_data.limit(int(count/2))
+            second_data = self.all_data.subtract(first_data)\
+                                       .withColumn("index", monotonically_increasing_id())\
+                                       .select(F.col("id").alias("dst_id"),
+                                               F.col("Lat").alias("dst_lat"),
+                                               F.col("Lon").alias("dst_lon"),
+                                               F.col("index"))
+            first_data = first_data.withColumn("index", monotonically_increasing_id())\
+                                   .select(F.col("id").alias("src_id"),
+                                           F.col("Lat").alias("src_lat"),
+                                           F.col("Lon").alias("src_lon"),
+                                           F.col("index"))
 
-        if self.start_data_id is not None and self.end_data_id is not None:
-            value = {'src': self.start_data_id, 'dst': self.end_data_id}
-            df = self.spark_session.createDataFrame([value, ])
-            self.edges = df if self.edges is None else self.edges.union(df)
+            travel_df = first_data.join(second_data, on="index", how="inner")
+            return travel_df.select(
+                F.col('src_id').alias('src'),
+                F.col('dst_id').alias('dst')
+            )
+        return None
 
-    def _erase_position_ids(self):
-        """
-        if two data is arrived after all processes ids must set as None
-        :return:
-        """
-        if self.start_data_id is not None and self.end_data_id is not None:
-            self.start_data_id = None
-            self.end_data_id = None
-
-    def _page_rank(self) -> list:
+    def _page_rank(self, edges) -> list:
         """
         create graph based on vertices and edges and
+        :param: edges:
         :return: a list of dictionary that each dictionary is a point with page_rank score
         """
-        if self.edges is None or self.vertices is None:
+        if edges is None or self.vertices is None:
             return None
-        graph = GraphFrame(self.vertices, self.edges)
+        graph = GraphFrame(self.vertices, edges)
         page_rank_result = graph.pageRank(resetProbability=0.15, tol=0.01) \
                                 .vertices \
                                 .sort('pagerank', ascending=False) \
@@ -67,14 +72,15 @@ class PageRankBlock(BaseBlock, ABC):
         key = f"({value['Lat']}, {value['Lon']})"
         value['id'] = key
 
-        # add to vertices and edges
-        df = self.spark_session.createDataFrame([value, ]).select('id', 'Lat', 'Lon')
-        self.vertices = df if self.edges is None else self.vertices.union(df)
-        self._set_edges(key)
+        # add to vertices and create edges
+        df = self.spark_session.createDataFrame([value, ])
+        self.all_data = df if self.all_data is None else self.all_data.union(df)
+        self.vertices = df.select('id', 'Lat', 'Lon') if self.vertices is None else self.vertices.union(df.select('id', 'Lat', 'Lon'))
+        self.vertices = self.vertices.dropDuplicates()
+        edges = self._create_edges()
 
-        self._erase_position_ids()
         # page_rank result
-        return self._page_rank()
+        return self._page_rank(edges)
 
     def _normal_run(self):
         """
@@ -85,8 +91,9 @@ class PageRankBlock(BaseBlock, ABC):
         self._normal_setup()
         if self.consumer:
             for each in self.consumer:
+                self.is_even_data = not self.is_even_data
                 produced_data = self._produce_answer(each)
-                if self.vertices and self.edges and produced_data:
+                if self.vertices and produced_data:
                     self._send_data(data=produced_data)
 
         else:
