@@ -1,9 +1,10 @@
 ﻿confluent-kafka==1.9.0
 kafka-python==2.0.2
 numpy==1.23.0
-pandas==1.4.3
+pandas~=1.3.5
 python-dateutil==2.8.2
 python-environ==0.4.54
 pytz==2022.1
 six==1.16.0
 elasticsearch==8.1.1
+graphframes~=0.6
