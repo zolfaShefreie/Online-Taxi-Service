@@ -26,7 +26,7 @@ class KafkaManagement:
         """
         self.admin_client = KafkaAdminClient(bootstrap_servers=self.BOOTSTRAP_SERVERS)
         self._delete_topics()
-        time.sleep(5)
+        time.sleep(3)
         self._create_topics()
         self.threads = dict()
 
@@ -49,6 +49,7 @@ class KafkaManagement:
                 return result_messages
             except Exception as e:
                 # suppose exception for existed topic
+                break
                 print(e)
                 time.sleep(1)
                 break
@@ -85,10 +86,10 @@ class KafkaManagement:
         self._make_start_block_thread(block=file_streamer, key='file_streamer')
         
         # elasticsearch block
-        elastic_analyser = ElasticAnalyseBlock(consumer_topic=self.TOPICS[0], bootstrap_servers=self.BOOTSTRAP_SERVERS,
-                                               producer_topic=self.TOPICS[2])
-        # TODO consumer_topic=self.TOPICS[1]
-        self._make_start_block_thread(block=elastic_analyser, key='elastic_analyser')
+        # elastic_analyser = ElasticAnalyseBlock(consumer_topic=self.TOPICS[0], bootstrap_servers=self.BOOTSTRAP_SERVERS,
+        #                                        producer_topic=self.TOPICS[2])
+        # # TODO consumer_topic=self.TOPICS[1]
+        # self._make_start_block_thread(block=elastic_analyser, key='elastic_analyser')
 
         # pre_trained_cluster = PreTrainedClusteringBlock(bootstrap_servers=self.BOOTSTRAP_SERVERS,
         #                                                 producer_topic=self.TOPICS[1],
@@ -104,7 +105,8 @@ class KafkaManagement:
 
         page_rank = PageRankBlock(consumer_topic=self.TOPICS[0],
                                   bootstrap_servers=self.BOOTSTRAP_SERVERS,
-                                  producer_topic=self.TOPICS[-1])
+                                  producer_topic=self.TOPICS[-1],
+                                  spark_session=self.SPARK_SESSION)
         page_rank.run()
 
         # wait the all threads run

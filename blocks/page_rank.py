@@ -11,7 +11,7 @@ class PageRankBlock(BaseBlock, ABC):
     MAX_ITER = 10
 
     def __init__(self, *args, **kwargs):
-        super().__init__(consumer_topic=None, block_type=BlockType.normal, consumer_group_id=None, *args, **kwargs)
+        super().__init__(block_type=BlockType.normal, consumer_group_id=None, *args, **kwargs)
         self.start_data_id = None
         self.end_data_id = None
         self.vertices = None
@@ -49,7 +49,7 @@ class PageRankBlock(BaseBlock, ABC):
         if self.edges is None or self.vertices is None:
             return None
         graph = GraphFrame(self.vertices, self.edges)
-        page_rank_result = graph.pageRank(resetProbability=0.15, tol=0.01, maxIter=self.MAX_ITER) \
+        page_rank_result = graph.pageRank(resetProbability=0.15, tol=0.01) \
                                 .vertices \
                                 .sort('pagerank', ascending=False) \
                                 .select("Lat", "Lon", "pagerank")
@@ -68,8 +68,8 @@ class PageRankBlock(BaseBlock, ABC):
         value['id'] = key
 
         # add to vertices and edges
-        df = self.spark_session.createDataFrame([value, ]).select('Lat', 'Lon')
-        self.vertices = df if self.edges is None else self.edges.union(df)
+        df = self.spark_session.createDataFrame([value, ]).select('id', 'Lat', 'Lon')
+        self.vertices = df if self.edges is None else self.vertices.union(df)
         self._set_edges(key)
 
         self._erase_position_ids()
