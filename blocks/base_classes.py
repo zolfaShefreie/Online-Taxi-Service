@@ -1,4 +1,5 @@
 from kafka import KafkaProducer, KafkaConsumer
+from pyspark.sql.functions import from_json, to_json, struct, col
 import json
 import enum
 
@@ -49,6 +50,21 @@ class BaseBlock:
         """
         return json.dumps(data).encode('utf-8')
 
+    @staticmethod
+    def _get_value_schema():
+        """
+        in spark with have one column value that have json type. this method return schema of value column
+        :return:
+        """
+        raise NotImplementedError
+
+    @staticmethod
+    def _get_value_columns():
+        """
+        :return: a list of value columns that used to convert to json
+        """
+        raise NotImplementedError
+
     def _normal_run(self):
         """
         run normal block
@@ -85,10 +101,12 @@ class BaseBlock:
         self.consumer_df = self.spark_session.readStream.format("kafka") \
             .option("kafka.bootstrap.servers", self.bootstrap_servers) \
             .option("subscribe", self.consumer_topic) \
+            .option("startingOffsets", "earliest") \
+            .option("failOnDataLoss", "false") \
             .load()
-        # TODO: check can cast as json? if can't, find solution
-        self.consumer_df.selectExpr("CAST(key AS STRING)", "CAST(value AS JSON)")
-
+        self.consumer_df = self.consumer_df.withColumn("data", from_json(col('value').cast('string'),
+                                                                         self._get_value_schema()))\
+            .select('key', 'value', 'data.*', 'timestamp')
         return self.consumer_df
 
     def _spark_output_setup(self, result_df):
@@ -97,13 +115,18 @@ class BaseBlock:
         :param result_df:
         :return:
         """
-        # TODO: check can cast as json? if can't, find solution
-        result_df.selectExpr("CAST(key AS STRING)", "CAST(value AS JSON)") \
-                 .write \
-                 .format("kafka") \
-                 .option("kafka.bootstrap.servers", self.bootstrap_servers) \
-                 .option("topic", self.producer_topic) \
-                 .save()
+        col_list = self._get_value_columns()
+        result_df = result_df.withColumn("value", to_json(struct([x for x in col_list])))\
+            .drop(*col_list)
+        query_df = result_df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)") \
+            .writeStream \
+            .format("kafka") \
+            .option("kafka.bootstrap.servers", self.bootstrap_servers) \
+            .option("topic", self.producer_topic) \
+            .option("checkpointLocation", "checkpoint") \
+            .start()
+        query_df.awaitTermination()
+        # self.spark_session.streams.awaitAnyTermination()
 
     def _normal_setup(self):
         """
@@ -156,7 +179,7 @@ class BaseBlock:
             if spark_session is None:
                 raise Exception("the spark block must have spark session as parameter")
 
-        if block_type == BlockType.normal:
+        elif block_type == BlockType.normal:
             pass
 
         else:
