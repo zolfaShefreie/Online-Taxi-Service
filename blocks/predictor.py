@@ -10,40 +10,40 @@ from settings import KEYSPACE_NAME, CASSANDRA_HOST, CASSANDRA_PORT
 class CountPredictorBlock(BaseBlock, ABC):
     KEYSPACE_NAME = KEYSPACE_NAME
     TABLE_NAME = "uuid_table"
+    WEEK_TABLE_NAME = "week_table"
+    HALF_DAY_TABLE_NAME = "midday_table"
+    MONTH_TABLE_NAME = "month_table"
     DEFAULT_DATETIME_FORMAT = "yyyy-MM-dd HH:mm:ss"
+    MAX_NUMBER_START_TRAIN = 5
+    TEST_SIZE = 1
 
     def __init__(self, *args, **kwargs):
         super().__init__(block_type=BlockType.normal, consumer_group_id=None, *args, **kwargs)
-    
-    def _get_count(self, df, end_col_name: str):
-        """
-        get count of rows that between datetime and end_col_name
-        :param df: dataframe
-        :param end_col_name: 
-        :return: 
-        """
-        df.join(df.select(F.col('datetime').alias('another_datetime')))\
-            .filter(F.col('datetime') > F.col('another_datetime'))\
-            .withColumn("one", F.when(F.col('another_datetime').between(F.col("datetime"), F.col(end_col_name)), 1)
-                        .otherwise(0))\
-            .groupBy("uuid").agg(F.sum("one").alias(f"count_{end_col_name}"))
-        return self.spark_session.createDataFrame(df.take(df.count()))
 
-    def _pre_process(self, df):
+    def _pre_process_dataframe(self, df, key_col_name):
         """
-
+        pre_process data based on input of model.fit
         :param df:
+        :param key_col_name:
         :return:
         """
-        df = df.withColumn("datetime", F.to_timestamp(F.col("str_date_ime"), self.DEFAULT_DATETIME_FORMAT))
-        df = df.withColumn("after_12_hours", (F.unix_timestamp(F.col("str_date_ime")) + 12 * 60 * 60).cast('timestamp'))
-        # df = df.withColumn("after_7_day", (F.unix_timestamp(F.col("str_date_ime")) + 7 * 24 * 60 * 60).cast('timestamp'))
-        # df = df.withColumn("after_1_month", (F.unix_timestamp(F.col("str_date_ime")) + 30 * 24 * 60 * 60).cast('timestamp'))
-        df = self.spark_session.createDataFrame(df.take(df.count()))
-        df = self._get_count(df, "after_12_hours")
+        df = df.withColumn("y", F.size(F.col("date_time"))) \
+               .select(key_col_name, 'y') \
+               .withColumn("ds", F.to_timestamp(F.col(key_col_name)['0'], self.DEFAULT_DATETIME_FORMAT))\
+               .select("ds", "y") \
+               .sort(F.asc("count"))
+        return self.spark_session.createDataFrame(df.take(df.count()))
 
-        # df = self._get_count(df, "after_7_day")
-        # df = self._get_count(df, "after_1_month")
+    def _read_from_cassandra(self, table_name):
+        """
+        read table from cassandra via using spark
+        :param table_name:
+        :return:
+        """
+        return self.spark_session.read.format("org.apache.spark.sql.cassandra") \
+                   .options(table=table_name, keyspace=self.KEYSPACE_NAME.lower()) \
+                   .option("spark.cassandra.connection.host", CASSANDRA_HOST) \
+                   .load()
 
     def _produce_answer(self, entry_data):
         """
@@ -51,14 +51,9 @@ class CountPredictorBlock(BaseBlock, ABC):
         :param entry_data:
         :return:
         """
-        df = self.spark_session.read.format("org.apache.spark.sql.cassandra")\
-            .options(table=self.TABLE_NAME, keyspace=self.KEYSPACE_NAME.lower())\
-            .option("spark.cassandra.connection.host", CASSANDRA_HOST).\
-            load()
-        self._pre_process(df.select('str_date_ime', 'uuid'))
-        # df.printSchema()
-        # df.select('str_date_ime').show()
-        # print(df.take(1)[0].str_date_ime, "**************************************************")
+        half_day_df = self._pre_process_dataframe(self._read_from_cassandra(self.WEEK_TABLE_NAME), key_col_name="hour")
+        week_df = self._pre_process_dataframe(self._read_from_cassandra(self.WEEK_TABLE_NAME), key_col_name="week")
+        month_df = self._pre_process_dataframe(self._read_from_cassandra(self.WEEK_TABLE_NAME), key_col_name="month")
         return entry_data
 
     def _normal_run(self):

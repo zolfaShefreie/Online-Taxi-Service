@@ -86,10 +86,10 @@ class KafkaManagement:
         self._make_start_block_thread(block=file_streamer, key='file_streamer')
         
         # elasticsearch block
-        elastic_analyser = ElasticAnalyseBlock(consumer_topic=self.TOPICS[0], bootstrap_servers=self.BOOTSTRAP_SERVERS,
-                                               producer_topic=self.TOPICS[2])
-        # TODO consumer_topic=self.TOPICS[1]
-        self._make_start_block_thread(block=elastic_analyser, key='elastic_analyser')
+        # elastic_analyser = ElasticAnalyseBlock(consumer_topic=self.TOPICS[0], bootstrap_servers=self.BOOTSTRAP_SERVERS,
+        #                                        producer_topic=self.TOPICS[2])
+        # # TODO consumer_topic=self.TOPICS[1]
+        # self._make_start_block_thread(block=elastic_analyser, key='elastic_analyser')
         
         # cassandra block
         """# create cluster
