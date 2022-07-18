@@ -16,9 +16,16 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
         # first stream for base of interval separation
         self.origin = None
         self.first = 0
-        self.week_keys = list(list())
-        self.midday_keys = list(list())
-        self.month_keys = list(list())
+        self.week_keys = list()
+        self.week_values = {'date_time': list(), 'lat': list(), 'lon': list(), 'base': list(), 'cluster_number': list()}
+
+        self.midday_keys = list()
+        self.midday_values = {'date_time': list(), 'lat': list(), 'lon': list(), 'base': list(),
+                              'cluster_number': list()}
+
+        self.month_keys = list()
+        self.month_values = {'date_time': list(), 'lat': list(), 'lon': list(), 'base': list(),
+                             'cluster_number': list()}
 
         self.current_uuid = None  # str
         self.current_date = None  # date
@@ -50,7 +57,7 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
         self.session.execute(
             f"""
             CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.week_table (week tuple<text,text> PRIMARY KEY,
-            lat list<float>, lon list<float>, base list<text>, cluster_number list<int>)
+            date_time list<text>, lat list<float>, lon list<float>, base list<text>, cluster_number list<int>)
             """
         )
 
@@ -71,14 +78,14 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
         self.session.execute(
             f"""
             CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.midday_table (hour tuple<text,text> PRIMARY KEY,
-            lat list<float>, lon list<float>, base list<text>, cluster_number list<int>)
+            date_time list<text>, lat list<float>, lon list<float>, base list<text>, cluster_number list<int>)
             """
         )
 
         self.session.execute(
             f"""
             CREATE TABLE IF NOT EXISTS {self.KEYSPACE_NAME}.month_table (month tuple<text,text> PRIMARY KEY,
-            lat list<float>, lon list<float>, base list<text>, cluster_number list<int>)
+            date_time list<text>, lat list<float>, lon list<float>, base list<text>, cluster_number list<int>)
             """
         )
 
@@ -99,142 +106,34 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
     def _insert_week_table(self):
         self.session.execute(
             f"""
-            INSERT INTO {self.KEYSPACE_NAME}.week_table (week, lat, lon, base, cluster_number)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO {self.KEYSPACE_NAME}.week_table (week, date_time, lat, lon, base, cluster_number)
+            VALUES (%s, %s, %s, %s, %s, %s)
             """,
-            ((str(self.week_keys[-1][0]), str(self.week_keys[-1][1])), [0.0], [0.0], [''], [0])
-        )
-
-    def _update_week_table(self):
-        # check whether data entered or not
-        empty = self.session.execute(
-            f"""
-            select * from {self.KEYSPACE_NAME}.week_table 
-            where week = (%s, %s)
-            """,
-            (str(self.week_keys[0][0]), str(self.week_keys[0][1]))
-        )
-
-        # insert current stream to correspond key if no data have entered before
-        # else add current stream to correspond record
-        if empty[0].base[0] == '':
-            latitude = list()
-            longitude = list()
-            base = list()
-            cluster = list()
-        else:
-            latitude = [i for i in empty[0].lat]
-            longitude = [i for i in empty[0].lon]
-            base = [i for i in empty[0].base]
-            cluster = [i for i in empty[0].cluster_number]
-
-        latitude.append(self.current_lat)
-        longitude.append(self.current_lon)
-        base.append(self.current_base)
-        cluster.append(self.current_cluster_number)
-
-        # update correspond record
-        self.session.execute(
-            f"""
-            UPDATE {self.KEYSPACE_NAME}.week_table
-            SET lat = %s, lon = %s, base = %s, cluster_number = %s
-            WHERE week = (%s, %s)
-            """,
-            (latitude, longitude, base, cluster, str(self.week_keys[0][0]), str(self.week_keys[0][1]))
+            ((str(self.week_keys[0]), str(self.week_keys[1])), self.week_values['date_time'],
+             self.week_values['lat'], self.week_values['lon'], self.week_values['base'],
+             self.week_values['cluster_number'])
         )
 
     def _insert_midday_table(self):
         self.session.execute(
             f"""
-            INSERT INTO {self.KEYSPACE_NAME}.midday_table (hour, lat, lon, base, cluster_number)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO {self.KEYSPACE_NAME}.midday_table (hour, date_time, lat, lon, base, cluster_number)
+            VALUES (%s, %s, %s, %s, %s, %s)
             """,
-            ((str(self.midday_keys[-1][0]), str(self.midday_keys[-1][1])), [0.0], [0.0], [''], [0])
-        )
-
-    def _update_midday_table(self):
-        # check whether data entered or not
-        empty = self.session.execute(
-            f"""
-            select * from {self.KEYSPACE_NAME}.midday_table 
-            where hour = (%s, %s)
-            """,
-            (str(self.midday_keys[0][0]), str(self.midday_keys[0][1]))
-        )
-
-        # insert current stream to correspond key if no data have entered before
-        # else add current stream to correspond record
-        if empty[0].base[0] == '':
-            latitude = list()
-            longitude = list()
-            base = list()
-            cluster = list()
-        else:
-            latitude = [i for i in empty[0].lat]
-            longitude = [i for i in empty[0].lon]
-            base = [i for i in empty[0].base]
-            cluster = [i for i in empty[0].cluster_number]
-
-        latitude.append(self.current_lat)
-        longitude.append(self.current_lon)
-        base.append(self.current_base)
-        cluster.append(self.current_cluster_number)
-
-        # update correspond record
-        self.session.execute(
-            f"""
-            UPDATE {self.KEYSPACE_NAME}.midday_table
-            SET lat = %s, lon = %s, base = %s, cluster_number = %s
-            WHERE hour = (%s, %s)
-            """,
-            (latitude, longitude, base, cluster, str(self.midday_keys[0][0]), str(self.midday_keys[0][1]))
+            ((str(self.midday_keys[0]), str(self.midday_keys[1])), self.midday_values['date_time'],
+             self.midday_values['lat'], self.midday_values['lon'], self.midday_values['base'],
+             self.midday_values['cluster_number'])
         )
 
     def _insert_month_table(self):
         self.session.execute(
             f"""
-            INSERT INTO {self.KEYSPACE_NAME}.month_table (month, lat, lon, base, cluster_number)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO {self.KEYSPACE_NAME}.month_table (month, date_time, lat, lon, base, cluster_number)
+            VALUES (%s, %s, %s, %s, %s, %s)
             """,
-            ((str(self.month_keys[-1][0]), str(self.month_keys[-1][1])), [0.0], [0.0], [''], [0])
-        )
-
-    def _update_month_table(self):
-        # check whether data entered or not
-        empty = self.session.execute(
-            f"""
-            select * from {self.KEYSPACE_NAME}.month_table 
-            where month = (%s, %s)
-            """,
-            (str(self.month_keys[0][0]), str(self.month_keys[0][1]))
-        )
-
-        # insert current stream to correspond key if no data have entered before
-        # else add current stream to correspond record
-        if empty[0].base[0] == '':
-            latitude = list()
-            longitude = list()
-            base = list()
-            cluster = list()
-        else:
-            latitude = [i for i in empty[0].lat]
-            longitude = [i for i in empty[0].lon]
-            base = [i for i in empty[0].base]
-            cluster = [i for i in empty[0].cluster_number]
-
-        latitude.append(self.current_lat)
-        longitude.append(self.current_lon)
-        base.append(self.current_base)
-        cluster.append(self.current_cluster_number)
-
-        # update correspond record
-        self.session.execute(
-            f"""
-            UPDATE {self.KEYSPACE_NAME}.month_table
-            SET lat = %s, lon = %s, base = %s, cluster_number = %s
-            WHERE month = (%s, %s)
-            """,
-            (latitude, longitude, base, cluster, str(self.month_keys[0][0]), str(self.month_keys[0][1]))
+            ((str(self.month_keys[0]), str(self.month_keys[1])), self.month_values['date_time'],
+             self.month_values['lat'], self.month_values['lon'], self.month_values['base'],
+             self.month_values['cluster_number'])
         )
 
     def _insert_start_coordinates(self):
@@ -289,51 +188,62 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
     def _check_intervals(self):
         # check weekly key
         if self.first == 0:
-            start_date = self.current_date
+            next_week = self.current_date + datetime.timedelta(days=7)
+            self.week_keys = [self.current_date, next_week]
         else:
-            start_date = self.week_keys[-1][1]
-        for i in range(3):
-            next_week = start_date + datetime.timedelta(days=7)
-            self.week_keys.append([start_date, next_week])
-            self._insert_week_table()
-            start_date = self.week_keys[-1][1]
+            while self.current_date >= self.week_keys[1]:
+                if self.week_values['date_time']:
+                    self._insert_week_table()
+                next_week = self.week_keys[1] + datetime.timedelta(days=7)
+                self.week_keys = [self.week_keys[1], next_week]
+                for v in self.week_values.values():
+                    v.clear()
 
-        if self.current_date >= self.week_keys[0][1]:
-            self.week_keys.pop(0)
-
-        self._update_week_table()
+        self.week_values['date_time'].append(str(self.date_time))
+        self.week_values['lat'].append(self.current_lat)
+        self.week_values['lon'].append(self.current_lon)
+        self.week_values['base'].append(self.current_base)
+        self.week_values['cluster_number'].append(self.current_cluster_number)
 
         # check midday key
         if self.first == 0:
-            start = self.date_time
+            next_midday = (datetime.datetime.combine(self.date_time.date(), self.date_time.time())
+                           + datetime.timedelta(hours=12))
+            self.midday_keys = [self.date_time, next_midday]
         else:
-            start = self.midday_keys[-1][1]
-        for i in range(3):
-            next_midday = (datetime.datetime.combine(start.date(), start.time())+datetime.timedelta(hours=12))
-            self.midday_keys.append([start, next_midday])
-            self._insert_midday_table()
-            start = self.midday_keys[-1][1]
+            while self.date_time >= self.midday_keys[1]:
+                if self.midday_values['date_time']:
+                    self._insert_midday_table()
+                next_midday = (datetime.datetime.combine(self.midday_keys[1].date(), self.midday_keys[1].time())
+                               + datetime.timedelta(hours=12))
+                self.midday_keys = [self.midday_keys[1], next_midday]
+                for v in self.midday_values.values():
+                    v.clear()
 
-        if self.date_time >= self.midday_keys[0][1]:
-            self.midday_keys.pop(0)
-
-        self._update_midday_table()
+        self.midday_values['date_time'].append(str(self.date_time))
+        self.midday_values['lat'].append(self.current_lat)
+        self.midday_values['lon'].append(self.current_lon)
+        self.midday_values['base'].append(self.current_base)
+        self.midday_values['cluster_number'].append(self.current_cluster_number)
 
         # check monthly key
         if self.first == 0:
-            start_month = self.current_date
+            next_month = self.current_date + datetime.timedelta(days=30)
+            self.month_keys = [self.current_date, next_month]
         else:
-            start_month = self.month_keys[-1][1]
-        for i in range(3):
-            next_month = start_month + datetime.timedelta(days=30)
-            self.month_keys.append([start_month, next_month])
-            self._insert_month_table()
-            start_month = self.month_keys[-1][1]
+            while self.current_date >= self.month_keys[1]:
+                if self.month_values['date_time']:
+                    self._insert_month_table()
+                next_month = self.month_keys[1] + datetime.timedelta(days=30)
+                self.month_keys = [self.month_keys[1], next_month]
+                for v in self.month_values.values():
+                    v.clear()
 
-        if self.current_date >= self.month_keys[0][1]:
-            self.month_keys.pop(0)
-
-        self._update_month_table()
+        self.month_values['date_time'].append(str(self.date_time))
+        self.month_values['lat'].append(self.current_lat)
+        self.month_values['lon'].append(self.current_lon)
+        self.month_values['base'].append(self.current_base)
+        self.month_values['cluster_number'].append(self.current_cluster_number)
 
         # check same_coordinates and uuid
         self._insert_start_coordinates()
@@ -368,3 +278,5 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
         # close connection
         self.session.shutdown()
         self.cluster.shutdown()
+
+
