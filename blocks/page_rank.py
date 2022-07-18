@@ -8,6 +8,7 @@ from blocks.base_classes import BaseBlock, BlockType
 class PageRankBlock(BaseBlock, ABC):
 
     MAX_NUM_RESULT = 3
+    MAX_ITER = 10
 
     def __init__(self, *args, **kwargs):
         super().__init__(consumer_topic=None, block_type=BlockType.normal, consumer_group_id=None, *args, **kwargs)
@@ -43,12 +44,12 @@ class PageRankBlock(BaseBlock, ABC):
     def _page_rank(self) -> list:
         """
         create graph based on vertices and edges and
-        :return:
+        :return: a list of dictionary that each dictionary is a point with page_rank score
         """
         if self.edges is None or self.vertices is None:
             return None
         graph = GraphFrame(self.vertices, self.edges)
-        page_rank_result = graph.pageRank(resetProbability=0.15, tol=0.01) \
+        page_rank_result = graph.pageRank(resetProbability=0.15, tol=0.01, maxIter=self.MAX_ITER) \
                                 .vertices \
                                 .sort('pagerank', ascending=False) \
                                 .select("Lat", "Lon", "pagerank")

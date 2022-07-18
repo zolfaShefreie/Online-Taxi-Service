@@ -5,10 +5,11 @@ import threading
 from settings import BOOTSTRAP_SERVERS as setting_bootstrap_server
 from blocks.file_stream import FileStreamBlock
 from blocks.elastic_analyse import ElasticAnalyseBlock
+from blocks.page_rank import PageRankBlock
 
 
 class KafkaManagement:
-    TOPICS = ['FileDataTopic', 'ClusterTopic', 'ElasticTopic', ]
+    TOPICS = ['FileDataTopic', 'ClusterTopic', 'ElasticTopic', 'PageRankTopic']
     TOPIC_PARTITION = 1
     TOPIC_REPLICATION = 1
     BOOTSTRAP_SERVERS = setting_bootstrap_server
@@ -80,6 +81,11 @@ class KafkaManagement:
                                                producer_topic=self.TOPICS[2])
         # TODO consumer_topic=self.TOPICS[1]
         self._make_start_block_thread(block=elastic_analyser, key='elastic_analyser')
+
+        page_rank = PageRankBlock(consumer_topic=self.TOPICS[0],
+                                  bootstrap_servers=self.BOOTSTRAP_SERVERS,
+                                  producer_topic=self.TOPICS[-1])
+        page_rank.run()
 
         # wait the all threads run
         while True:
