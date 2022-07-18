@@ -16,9 +16,9 @@ class CountPredictorBlock(BaseBlock, ABC):
     HALF_DAY_TABLE_NAME = "midday_table"
     MONTH_TABLE_NAME = "month_table"
     DEFAULT_DATETIME_FORMAT = "yyyy-MM-dd HH:mm:ss"
-    MIN_NUMBER_START_TRAIN = 20
-    TRAIN_WAIT_STEP = 20
-    TEST_SPLIT = 0.10
+    MIN_NUMBER_START_TRAIN = {'half_day': 20, 'week': 6, 'month': 3}
+    TRAIN_WAIT_STEP = {'half_day': 20, 'week': 1, 'month': 1}
+    TEST_SPLIT = {'half_day': 0.10, 'week': 0.3, 'month': 1/3}
     RESULT_SCHEMA = StructType([
         StructField('ds', TimestampType()),
         StructField('y', DoubleType()),
@@ -35,13 +35,12 @@ class CountPredictorBlock(BaseBlock, ABC):
         self.week_model = Prophet()
         self.month_model = Prophet(seasonality_mode='multiplicative')
 
-    def _visualize(self, df, sub_dir_name, kind="week", test_df=None, model=None):
+    def _visualize(self, df, sub_dir_name, kind="week", model=None):
         """
         visualize the model prediction and save it
         :param df:
         :param sub_dir_name:
         :param kind:
-        :param test_df:
         :param model:
         :return:
         """
@@ -53,6 +52,16 @@ class CountPredictorBlock(BaseBlock, ABC):
         fig = plot[0].get_figure()
         fig.savefig(f"{self.SAVE_IMAGE_PATH}/{sub_dir_name}/_{self.last_train_index[kind]}/compare.png")
 
+    def _get_permission(self, df_count, kind="week") -> bool:
+        """
+        check can start new fit or not
+        :param df_count:
+        :param kind: half_day, week, month
+        :return:
+        """
+        limit = (self.last_train_index[kind] * self.TRAIN_WAIT_STEP[kind]) + self.MIN_NUMBER_START_TRAIN[kind]
+        return df_count >= limit
+
     def _models_management(self, half_day_df, week_df, month_df):
         """
         check that have learning condition and fit the model
@@ -61,23 +70,26 @@ class CountPredictorBlock(BaseBlock, ABC):
         :param month_df:
         :return:
         """
-        if half_day_df.count() > (self.last_train_index['half_day'] * self.TRAIN_WAIT_STEP) + self.MIN_NUMBER_START_TRAIN:
+        if self._get_permission(half_day_df.count(), 'half_day'):
             train_data = half_day_df.limit(int(half_day_df.count() * self.TEST_SPLIT))
             # test_data = half_day_df.subtract(train_data)
             result = self._predict(train_data.toPandas(), half_day_df.toPandas(), self.half_day_model)
             self.last_train_index['half_day'] = self.last_train_index['half_day'] + 1
+            self._visualize(result, 'half_day', 'half_day', self.half_day_model)
 
-        if week_df.count() > (self.last_train_index['week'] * self.TRAIN_WAIT_STEP) + self.MIN_NUMBER_START_TRAIN:
+        if self._get_permission(week_df.count(), 'week'):
             train_data = week_df.limit(int(week_df.count() * self.TEST_SPLIT))
             # test_data = week_df.subtract(train_data)
             result = self._predict(train_data.toPandas(), week_df.toPandas(), self.week_model)
             self.last_train_index['week'] = self.last_train_index['week'] + 1
+            self._visualize(result, 'week', 'week', self.week_model)
 
-        if month_df.count() > (self.last_train_index['month'] * self.TRAIN_WAIT_STEP) + self.MIN_NUMBER_START_TRAIN:
+        if self._get_permission(month_df.count(), 'month'):
             train_data = month_df.limit(int(month_df.count() * self.TEST_SPLIT))
             # test_data = month_df.subtract(train_data)
             result = self._predict(train_data.toPandas(), month_df.toPandas(), self.month_model)
             self.last_train_index['month'] = self.last_train_index['month'] + 1
+            self._visualize(result, 'month', 'month', self.month_model)
 
     def _predict(self, pd_train_df, pd_df, model):
         """
