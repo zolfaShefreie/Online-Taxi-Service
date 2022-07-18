@@ -16,9 +16,9 @@ class CountPredictorBlock(BaseBlock, ABC):
     HALF_DAY_TABLE_NAME = "midday_table"
     MONTH_TABLE_NAME = "month_table"
     DEFAULT_DATETIME_FORMAT = "yyyy-MM-dd HH:mm:ss"
-    MIN_NUMBER_START_TRAIN = {'half_day': 20, 'week': 6, 'month': 3}
-    TRAIN_WAIT_STEP = {'half_day': 20, 'week': 1, 'month': 1}
-    TEST_SPLIT = {'half_day': 0.10, 'week': 0.3, 'month': 1/3}
+    MIN_NUMBER_START_TRAIN = {'half_day': 4, 'week': 6, 'month': 4}
+    TRAIN_WAIT_STEP = {'half_day': 3, 'week': 1, 'month': 1}
+    TEST_SPLIT = {'half_day': 1/3, 'week': 0.3, 'month': 1/3}
     RESULT_SCHEMA = StructType([
         StructField('ds', TimestampType()),
         StructField('y', DoubleType()),
@@ -71,21 +71,23 @@ class CountPredictorBlock(BaseBlock, ABC):
         :return:
         """
         if self._get_permission(half_day_df.count(), 'half_day'):
-            train_data = half_day_df.limit(int(half_day_df.count() * self.TEST_SPLIT))
+            train_data = half_day_df.limit(int(half_day_df.count() * (1 - self.TEST_SPLIT['half_day'])))
+            print("****************************************************************************")
+            train_data.show()
             # test_data = half_day_df.subtract(train_data)
             result = self._predict(train_data.toPandas(), half_day_df.toPandas(), self.half_day_model)
             self.last_train_index['half_day'] = self.last_train_index['half_day'] + 1
             self._visualize(result, 'half_day', 'half_day', self.half_day_model)
 
         if self._get_permission(week_df.count(), 'week'):
-            train_data = week_df.limit(int(week_df.count() * self.TEST_SPLIT))
+            train_data = week_df.limit(int(week_df.count() * (1 - self.TEST_SPLIT['week'])))
             # test_data = week_df.subtract(train_data)
             result = self._predict(train_data.toPandas(), week_df.toPandas(), self.week_model)
             self.last_train_index['week'] = self.last_train_index['week'] + 1
             self._visualize(result, 'week', 'week', self.week_model)
 
         if self._get_permission(month_df.count(), 'month'):
-            train_data = month_df.limit(int(month_df.count() * self.TEST_SPLIT))
+            train_data = month_df.limit(int(month_df.count() * (1 - self.TEST_SPLIT['month'])))
             # test_data = month_df.subtract(train_data)
             result = self._predict(train_data.toPandas(), month_df.toPandas(), self.month_model)
             self.last_train_index['month'] = self.last_train_index['month'] + 1
@@ -99,6 +101,7 @@ class CountPredictorBlock(BaseBlock, ABC):
         :param pd_df:
         :return:
         """
+        print(pd_train_df)
         model.fit(pd_train_df)
         forecast_pd = model.predict(pd_df)
         f_pd = forecast_pd[['ds', 'yhat', 'yhat_upper', 'yhat_lower']].set_index('ds')
@@ -113,12 +116,14 @@ class CountPredictorBlock(BaseBlock, ABC):
         :param key_col_name:
         :return:
         """
-        df = df.withColumn("y", F.size(F.col("date_time"))) \
-               .select(key_col_name, 'y') \
-               .withColumn("ds", F.to_timestamp(F.col(key_col_name)['0'], self.DEFAULT_DATETIME_FORMAT))\
-               .select("ds", "y") \
-               .sort(F.asc("count"))
-        return self.spark_session.createDataFrame(df.take(df.count()))
+        if df.count() != 0:
+            df = df.withColumn("y", F.size(F.col("date_time"))) \
+                   .select(key_col_name, 'y') \
+                   .withColumn("ds", F.to_timestamp(F.col(key_col_name)['0'], self.DEFAULT_DATETIME_FORMAT))\
+                   .select("ds", "y") \
+                   .sort(F.asc("ds"))
+            return self.spark_session.createDataFrame(df.take(df.count()))
+        return df
 
     def _read_from_cassandra(self, table_name):
         """
@@ -137,9 +142,9 @@ class CountPredictorBlock(BaseBlock, ABC):
         :param entry_data:
         :return:
         """
-        half_day_df = self._pre_process_dataframe(self._read_from_cassandra(self.WEEK_TABLE_NAME), key_col_name="hour")
+        half_day_df = self._pre_process_dataframe(self._read_from_cassandra(self.HALF_DAY_TABLE_NAME), key_col_name="hour")
         week_df = self._pre_process_dataframe(self._read_from_cassandra(self.WEEK_TABLE_NAME), key_col_name="week")
-        month_df = self._pre_process_dataframe(self._read_from_cassandra(self.WEEK_TABLE_NAME), key_col_name="month")
+        month_df = self._pre_process_dataframe(self._read_from_cassandra(self.MONTH_TABLE_NAME), key_col_name="month")
         self._models_management(half_day_df, week_df, month_df)
         return entry_data
 
