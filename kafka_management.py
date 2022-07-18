@@ -82,17 +82,17 @@ class KafkaManagement:
         file_streamer = FileStreamBlock(bootstrap_servers=self.BOOTSTRAP_SERVERS, producer_topic=self.TOPICS[0])
         self._make_start_block_thread(block=file_streamer, key='file_streamer')
 
-        # pre_trained_cluster = PreTrainedClusteringBlock(bootstrap_servers=self.BOOTSTRAP_SERVERS,
-        #                                                 producer_topic=self.TOPICS[1],
-        #                                                 consumer_topic=self.TOPICS[0],
-        #                                                 spark_session=self.SPARK_SESSION)
-        # self._make_start_block_thread(block=pre_trained_cluster, key='pre_trained_cluster')
+        pre_trained_cluster = PreTrainedClusteringBlock(bootstrap_servers=self.BOOTSTRAP_SERVERS,
+                                                        producer_topic=self.TOPICS[1],
+                                                        consumer_topic=self.TOPICS[0],
+                                                        spark_session=self.SPARK_SESSION)
+        self._make_start_block_thread(block=pre_trained_cluster, key='pre_trained_cluster')
 
-        online_clustering = OnlineClusteringBlock(bootstrap_servers=self.BOOTSTRAP_SERVERS,
-                                                  producer_topic=self.TOPICS[1],
-                                                  consumer_topic=self.TOPICS[0],
-                                                  spark_session=self.SPARK_SESSION)
-        online_clustering.run()
+        # online_clustering = OnlineClusteringBlock(bootstrap_servers=self.BOOTSTRAP_SERVERS,
+        #                                           producer_topic=self.TOPICS[1],
+        #                                           consumer_topic=self.TOPICS[0],
+        #                                           spark_session=self.SPARK_SESSION)
+        # online_clustering.run()
 
         # wait the all threads run
         while True:

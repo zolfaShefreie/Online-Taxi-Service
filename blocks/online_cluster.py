@@ -3,7 +3,7 @@ from pyspark.sql.types import StructType, StructField, FloatType, StringType
 from pyspark.sql.functions import lit, col
 from pyspark.ml.clustering import KMeansModel, KMeans
 from pyspark.ml.feature import VectorAssembler
-from pyspark.ml.feature import StandardScaler
+from pyspark.ml.feature import StandardScaler, StandardScalerModel
 import json
 
 from blocks.base_classes import BaseBlock, BlockType
@@ -13,12 +13,13 @@ from utils.cluster_methods import OnlineKMeans
 
 class PreTrainedClusteringBlock(BaseBlock, ABC):
     CLUSTER_NUM = 7
-    SAVED_MODEL_PATH = SAVED_TRANSFORMERS_PATH + "/" + "kmeans_model_11"
+    SAVED_MODEL_PATH = SAVED_TRANSFORMERS_PATH + "/" + "kmeans_model_7"
+    SCALER_MODEL_PATH = SAVED_TRANSFORMERS_PATH + "/" + "scaler"
 
     def __init__(self, *args, **kwargs):
         super().__init__(block_type=BlockType.spark, *args, **kwargs)
         self.assemble = VectorAssembler(inputCols=['Lat', 'Lon'], outputCol='features')
-        self.scaler = StandardScaler(inputCol='features', outputCol='standardized')
+        self.scaler = StandardScalerModel.load(self.SCALER_MODEL_PATH)
         self.kmeans_model = KMeansModel.load(self.SAVED_MODEL_PATH)
 
     @staticmethod
@@ -51,9 +52,7 @@ class PreTrainedClusteringBlock(BaseBlock, ABC):
         :return:
         """
         assembled_data = self.assemble.transform(entry_data)
-        # data_scale = self.scaler.fit(assembled_data)
-        # data_scale_output = data_scale.transform(assembled_data)
-        data_scale_output = assembled_data.withColumn("standardized", col("features"))
+        data_scale_output = self.scaler.transform(assembled_data)
         return self.kmeans_model.transform(data_scale_output)
 
     def _spark_run(self):
