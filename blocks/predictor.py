@@ -1,7 +1,10 @@
 from abc import ABC
 import pyspark.sql.functions as F
 from prophet import Prophet
-from pyspark.ml.feature import VectorAssembler
+from pyspark.sql.types import StructType, StructField, TimestampType, IntegerType, DoubleType
+import matplotlib.pyplot as plt
+import os
+import json
 
 from blocks.base_classes import BaseBlock, BlockType
 from settings import KEYSPACE_NAME, CASSANDRA_HOST, CASSANDRA_PORT
@@ -9,16 +12,87 @@ from settings import KEYSPACE_NAME, CASSANDRA_HOST, CASSANDRA_PORT
 
 class CountPredictorBlock(BaseBlock, ABC):
     KEYSPACE_NAME = KEYSPACE_NAME
-    TABLE_NAME = "uuid_table"
     WEEK_TABLE_NAME = "week_table"
     HALF_DAY_TABLE_NAME = "midday_table"
     MONTH_TABLE_NAME = "month_table"
     DEFAULT_DATETIME_FORMAT = "yyyy-MM-dd HH:mm:ss"
-    MAX_NUMBER_START_TRAIN = 5
-    TEST_SIZE = 1
+    MIN_NUMBER_START_TRAIN = 20
+    TRAIN_WAIT_STEP = 20
+    TEST_SPLIT = 0.10
+    RESULT_SCHEMA = StructType([
+        StructField('ds', TimestampType()),
+        StructField('y', DoubleType()),
+        StructField('yhat', DoubleType()),
+        StructField('yhat_upper', DoubleType()),
+        StructField('yhat_lower', DoubleType())
+    ])
+    SAVE_IMAGE_PATH = "./predictor_images"
 
     def __init__(self, *args, **kwargs):
         super().__init__(block_type=BlockType.normal, consumer_group_id=None, *args, **kwargs)
+        self.last_train_index = {'half_day': 0, 'week': 0, 'month': 0}
+        self.half_day_model = Prophet(changepoint_prior_scale=0.02)
+        self.week_model = Prophet()
+        self.month_model = Prophet(seasonality_mode='multiplicative')
+
+    def _visualize(self, df, sub_dir_name, kind="week", test_df=None, model=None):
+        """
+        visualize the model prediction and save it
+        :param df:
+        :param sub_dir_name:
+        :param kind:
+        :param test_df:
+        :param model:
+        :return:
+        """
+        if not os.path.exists(f"{self.SAVE_IMAGE_PATH}/{sub_dir_name}/_{self.last_train_index[kind]}"):
+            os.mkdir(f"{self.SAVE_IMAGE_PATH}/{sub_dir_name}/_{self.last_train_index[kind]}")
+
+        df = df.toPandas().set_index('ds')
+        plot = df[['y', 'yhat']].plot()
+        fig = plot[0].get_figure()
+        fig.savefig(f"{self.SAVE_IMAGE_PATH}/{sub_dir_name}/_{self.last_train_index[kind]}/compare.png")
+
+    def _models_management(self, half_day_df, week_df, month_df):
+        """
+        check that have learning condition and fit the model
+        :param half_day_df:
+        :param week_df:
+        :param month_df:
+        :return:
+        """
+        if half_day_df.count() > (self.last_train_index['half_day'] * self.TRAIN_WAIT_STEP) + self.MIN_NUMBER_START_TRAIN:
+            train_data = half_day_df.limit(int(half_day_df.count() * self.TEST_SPLIT))
+            # test_data = half_day_df.subtract(train_data)
+            result = self._predict(train_data.toPandas(), half_day_df.toPandas(), self.half_day_model)
+            self.last_train_index['half_day'] = self.last_train_index['half_day'] + 1
+
+        if week_df.count() > (self.last_train_index['week'] * self.TRAIN_WAIT_STEP) + self.MIN_NUMBER_START_TRAIN:
+            train_data = week_df.limit(int(week_df.count() * self.TEST_SPLIT))
+            # test_data = week_df.subtract(train_data)
+            result = self._predict(train_data.toPandas(), week_df.toPandas(), self.week_model)
+            self.last_train_index['week'] = self.last_train_index['week'] + 1
+
+        if month_df.count() > (self.last_train_index['month'] * self.TRAIN_WAIT_STEP) + self.MIN_NUMBER_START_TRAIN:
+            train_data = month_df.limit(int(month_df.count() * self.TEST_SPLIT))
+            # test_data = month_df.subtract(train_data)
+            result = self._predict(train_data.toPandas(), month_df.toPandas(), self.month_model)
+            self.last_train_index['month'] = self.last_train_index['month'] + 1
+
+    def _predict(self, pd_train_df, pd_df, model):
+        """
+        fit model and make future data to predict
+        :param pd_train_df:
+        :param model:
+        :param pd_df:
+        :return:
+        """
+        model.fit(pd_train_df)
+        forecast_pd = model.predict(pd_df)
+        f_pd = forecast_pd[['ds', 'yhat', 'yhat_upper', 'yhat_lower']].set_index('ds')
+        f_pd['y'] = pd_df.set_index('ds')['y']
+        return self.spark_session.createDataFrame(f_pd[['ds', 'y', 'yhat', 'yhat_upper', 'yhat_lower']],
+                                                  schema=self.RESULT_SCHEMA)
 
     def _pre_process_dataframe(self, df, key_col_name):
         """
@@ -54,6 +128,7 @@ class CountPredictorBlock(BaseBlock, ABC):
         half_day_df = self._pre_process_dataframe(self._read_from_cassandra(self.WEEK_TABLE_NAME), key_col_name="hour")
         week_df = self._pre_process_dataframe(self._read_from_cassandra(self.WEEK_TABLE_NAME), key_col_name="week")
         month_df = self._pre_process_dataframe(self._read_from_cassandra(self.WEEK_TABLE_NAME), key_col_name="month")
+        self._models_management(half_day_df, week_df, month_df)
         return entry_data
 
     def _normal_run(self):
@@ -65,8 +140,7 @@ class CountPredictorBlock(BaseBlock, ABC):
         self._normal_setup()
         if self.consumer:
             for each in self.consumer:
-                result = self._produce_answer(each)
-                # self._send_data(result)
-
+                self._produce_answer(each)
+                self._send_data(data=json.loads(each.value.decode('utf-8')), key=each.key, timestamp_ms=each.timestamp)
         else:
             pass
