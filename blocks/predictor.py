@@ -16,9 +16,9 @@ class CountPredictorBlock(BaseBlock, ABC):
     HALF_DAY_TABLE_NAME = "midday_table"
     MONTH_TABLE_NAME = "month_table"
     DEFAULT_DATETIME_FORMAT = "yyyy-MM-dd HH:mm:ss"
-    MIN_NUMBER_START_TRAIN = {'half_day': 4, 'week': 6, 'month': 4}
-    TRAIN_WAIT_STEP = {'half_day': 3, 'week': 1, 'month': 1}
-    TEST_SPLIT = {'half_day': 1/3, 'week': 0.3, 'month': 1/3}
+    MIN_NUMBER_START_TRAIN = {'half_day': 20, 'week': 5, 'month': 4}
+    TRAIN_WAIT_STEP = {'half_day': 20, 'week': 1, 'month': 1}
+    TEST_SPLIT = {'half_day': 0.2, 'week': 1/5, 'month': 1/3}
     RESULT_SCHEMA = StructType([
         StructField('ds', TimestampType()),
         StructField('y', IntegerType()),
@@ -73,7 +73,7 @@ class CountPredictorBlock(BaseBlock, ABC):
         if self._get_permission(half_day_df.count(), 'half_day'):
             half_day_model = Prophet(seasonality_mode='multiplicative', changepoint_prior_scale=0.01,
                                      yearly_seasonality=True)
-            half_day_model.add_seasonality(name='monthly', period=31, fourier_order=5)
+            half_day_model.add_seasonality(name='monthly', period=30, fourier_order=5)
             train_data = half_day_df.limit(int(half_day_df.count() * (1 - self.TEST_SPLIT['half_day'])))
             train_data.show()
             # test_data = half_day_df.subtract(train_data)
