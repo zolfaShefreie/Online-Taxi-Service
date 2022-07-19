@@ -2,7 +2,7 @@ from abc import ABC
 import pyspark.sql.functions as F
 from prophet import Prophet
 from pyspark.sql.types import StructType, StructField, TimestampType, IntegerType, DoubleType
-import matplotlib.pyplot as plt
+import pandas as pd
 import os
 import json
 
@@ -21,7 +21,7 @@ class CountPredictorBlock(BaseBlock, ABC):
     TEST_SPLIT = {'half_day': 1/3, 'week': 0.3, 'month': 1/3}
     RESULT_SCHEMA = StructType([
         StructField('ds', TimestampType()),
-        StructField('y', DoubleType()),
+        StructField('y', IntegerType()),
         StructField('yhat', DoubleType()),
         StructField('yhat_upper', DoubleType()),
         StructField('yhat_lower', DoubleType())
@@ -31,9 +31,6 @@ class CountPredictorBlock(BaseBlock, ABC):
     def __init__(self, *args, **kwargs):
         super().__init__(block_type=BlockType.normal, consumer_group_id=None, *args, **kwargs)
         self.last_train_index = {'half_day': 0, 'week': 0, 'month': 0}
-        self.half_day_model = Prophet(changepoint_prior_scale=0.02)
-        self.week_model = Prophet()
-        self.month_model = Prophet(seasonality_mode='multiplicative')
 
     def _visualize(self, df, sub_dir_name, kind="week", model=None):
         """
@@ -45,12 +42,15 @@ class CountPredictorBlock(BaseBlock, ABC):
         :return:
         """
         if not os.path.exists(f"{self.SAVE_IMAGE_PATH}/{sub_dir_name}/_{self.last_train_index[kind]}"):
-            os.mkdir(f"{self.SAVE_IMAGE_PATH}/{sub_dir_name}/_{self.last_train_index[kind]}")
+            os.makedirs(f"{self.SAVE_IMAGE_PATH}/{sub_dir_name}/_{self.last_train_index[kind]}")
 
-        df = df.toPandas().set_index('ds')
-        plot = df[['y', 'yhat']].plot()
-        fig = plot[0].get_figure()
+        df = df.toPandas()
+        df_1 = df.set_index('ds')
+        plot = df_1[['y', 'yhat']].plot()
+        fig = plot.get_figure()
         fig.savefig(f"{self.SAVE_IMAGE_PATH}/{sub_dir_name}/_{self.last_train_index[kind]}/compare.png")
+        model.plot(df).savefig(f"{self.SAVE_IMAGE_PATH}/{sub_dir_name}/_{self.last_train_index[kind]}/model_plot.png")
+        model.plot_components(df).savefig(f"{self.SAVE_IMAGE_PATH}/{sub_dir_name}/_{self.last_train_index[kind]}/components.png")
 
     def _get_permission(self, df_count, kind="week") -> bool:
         """
@@ -71,27 +71,31 @@ class CountPredictorBlock(BaseBlock, ABC):
         :return:
         """
         if self._get_permission(half_day_df.count(), 'half_day'):
+            half_day_model = Prophet(seasonality_mode='multiplicative', changepoint_prior_scale=0.01,
+                                     yearly_seasonality=True)
+            half_day_model.add_seasonality(name='monthly', period=31, fourier_order=5)
             train_data = half_day_df.limit(int(half_day_df.count() * (1 - self.TEST_SPLIT['half_day'])))
-            print("****************************************************************************")
             train_data.show()
             # test_data = half_day_df.subtract(train_data)
-            result = self._predict(train_data.toPandas(), half_day_df.toPandas(), self.half_day_model)
+            result = self._predict(train_data.toPandas(), half_day_df.toPandas(), half_day_model)
             self.last_train_index['half_day'] = self.last_train_index['half_day'] + 1
-            self._visualize(result, 'half_day', 'half_day', self.half_day_model)
+            self._visualize(result, 'half_day', 'half_day', half_day_model)
 
         if self._get_permission(week_df.count(), 'week'):
+            week_model = Prophet(seasonality_mode='multiplicative', yearly_seasonality=True)
             train_data = week_df.limit(int(week_df.count() * (1 - self.TEST_SPLIT['week'])))
             # test_data = week_df.subtract(train_data)
-            result = self._predict(train_data.toPandas(), week_df.toPandas(), self.week_model)
+            result = self._predict(train_data.toPandas(), week_df.toPandas(), week_model)
             self.last_train_index['week'] = self.last_train_index['week'] + 1
-            self._visualize(result, 'week', 'week', self.week_model)
+            self._visualize(result, 'week', 'week', week_model)
 
         if self._get_permission(month_df.count(), 'month'):
+            month_model = Prophet(seasonality_mode='multiplicative', yearly_seasonality=True)
             train_data = month_df.limit(int(month_df.count() * (1 - self.TEST_SPLIT['month'])))
             # test_data = month_df.subtract(train_data)
-            result = self._predict(train_data.toPandas(), month_df.toPandas(), self.month_model)
+            result = self._predict(train_data.toPandas(), month_df.toPandas(), month_model)
             self.last_train_index['month'] = self.last_train_index['month'] + 1
-            self._visualize(result, 'month', 'month', self.month_model)
+            self._visualize(result, 'month', 'month', month_model)
 
     def _predict(self, pd_train_df, pd_df, model):
         """
@@ -101,13 +105,11 @@ class CountPredictorBlock(BaseBlock, ABC):
         :param pd_df:
         :return:
         """
-        print(pd_train_df)
+
         model.fit(pd_train_df)
         forecast_pd = model.predict(pd_df)
-        f_pd = forecast_pd[['ds', 'yhat', 'yhat_upper', 'yhat_lower']].set_index('ds')
-        f_pd['y'] = pd_df.set_index('ds')['y']
-        return self.spark_session.createDataFrame(f_pd[['ds', 'y', 'yhat', 'yhat_upper', 'yhat_lower']],
-                                                  schema=self.RESULT_SCHEMA)
+        merge_result = pd.merge(forecast_pd, pd_df, on='ds')
+        return self.spark_session.createDataFrame(merge_result)
 
     def _pre_process_dataframe(self, df, key_col_name):
         """
