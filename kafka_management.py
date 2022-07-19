@@ -5,10 +5,11 @@ import threading
 from settings import BOOTSTRAP_SERVERS as setting_bootstrap_server
 from blocks.file_stream import FileStreamBlock
 from blocks.elastic_analyse import ElasticAnalyseBlock
+from blocks.redis_analyse import RedisAnalyseBlock
 
 
 class KafkaManagement:
-    TOPICS = ['FileDataTopic', 'ClusterTopic', 'ElasticTopic', ]
+    TOPICS = ['FileDataTopic', 'ClusterTopic', 'ElasticTopic', 'RedisTopic', ]
     TOPIC_PARTITION = 1
     TOPIC_REPLICATION = 1
     BOOTSTRAP_SERVERS = setting_bootstrap_server
@@ -80,6 +81,12 @@ class KafkaManagement:
                                                producer_topic=self.TOPICS[2])
         # TODO consumer_topic=self.TOPICS[1]
         self._make_start_block_thread(block=elastic_analyser, key='elastic_analyser')
+        
+        # redis block
+        reids_analyser = RedisAnalyseBlock(consumer_topic=self.TOPICS[0], bootstrap_servers=self.BOOTSTRAP_SERVERS,
+                                           producer_topic=self.TOPICS[4])
+        # TODO consumer_topic=self.TOPICS[3]
+        self._make_start_block_thread(block=reids_analyser, key='redis_analyser')
 
         # wait the all threads run
         while True:
