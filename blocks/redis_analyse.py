@@ -109,6 +109,8 @@ class RedisAnalyseBlock(BaseBlock, ABC):
                 result2 = self._get_previous_hour()
                 print('result')
                 print(result2)
+                
+                self._send_data(data=json.loads(each.value.decode('utf-8')), key=each.key, timestamp_ms=each.timestamp)
 
         else:
             print("No data in previous phase topic")
