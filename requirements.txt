@@ -7,3 +7,5 @@ python-environ==0.4.54
 pytz==2022.1
 six==1.16.0
 elasticsearch==8.1.1
+cassandra-driver==3.25.0
+redis==4.3.4
