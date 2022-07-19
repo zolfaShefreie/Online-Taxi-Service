@@ -1,10 +1,9 @@
 from kafka.admin import KafkaAdminClient, NewTopic
+from pyspark.sql import SparkSession
 import time
 import threading
 import findspark
 findspark.init()
-from pyspark.sql import SparkSession
-from cassandra.cluster import Cluster
 
 from settings import BOOTSTRAP_SERVERS as setting_bootstrap_server
 from blocks.file_stream import FileStreamBlock
@@ -13,10 +12,12 @@ from blocks.cassandra_analyse import CassandraAnalyseBlock
 from blocks.redis_analyse import RedisAnalyseBlock
 from blocks.page_rank import PageRankBlock
 from blocks.online_cluster import PreTrainedClusteringBlock, OnlineClusteringBlock
+from blocks.predictor import CountPredictorBlock
 
 
 class KafkaManagement:
-    TOPICS = ['FileDataTopic', 'ClusterTopic', 'ElasticTopic', 'CassandraTopic', 'RedisTopic', 'PageRankTopic']
+    TOPICS = ['FileDataTopic', 'ClusterTopic', 'ElasticTopic', 'CassandraTopic', 'RedisTopic',
+              'PredictorTopic', 'PageRankTopic']
 
     TOPIC_PARTITION = 1
     TOPIC_REPLICATION = 1
@@ -30,7 +31,7 @@ class KafkaManagement:
         """
         self.admin_client = KafkaAdminClient(bootstrap_servers=self.BOOTSTRAP_SERVERS)
         self._delete_topics()
-        time.sleep(3)
+        time.sleep(5)
         self._create_topics()
         self.threads = dict()
 
@@ -53,9 +54,7 @@ class KafkaManagement:
                 return result_messages
             except Exception as e:
                 # suppose exception for existed topic
-                break
                 print(e)
-                time.sleep(1)
                 break
 
     def _delete_topics(self):
@@ -88,12 +87,11 @@ class KafkaManagement:
         # blocks
         file_streamer = FileStreamBlock(bootstrap_servers=self.BOOTSTRAP_SERVERS, producer_topic=self.TOPICS[0])
         self._make_start_block_thread(block=file_streamer, key='file_streamer')
-        
-        # elasticsearch block
-        # elastic_analyser = ElasticAnalyseBlock(consumer_topic=self.TOPICS[0], bootstrap_servers=self.BOOTSTRAP_SERVERS,
-        #                                        producer_topic=self.TOPICS[2])
-        # # TODO consumer_topic=self.TOPICS[1]
-        # self._make_start_block_thread(block=elastic_analyser, key='elastic_analyser')
+
+        elastic_analyser = ElasticAnalyseBlock(consumer_topic=self.TOPICS[0], bootstrap_servers=self.BOOTSTRAP_SERVERS,
+                                               producer_topic=self.TOPICS[2])
+        # TODO consumer_topic=self.TOPICS[1]
+        self._make_start_block_thread(block=elastic_analyser, key='elastic_analyser')
 
         # cassandra block
         """# create cluster
@@ -130,6 +128,11 @@ class KafkaManagement:
                                   producer_topic=self.TOPICS[-1],
                                   spark_session=self.SPARK_SESSION)
         self._make_start_block_thread(block=page_rank, key='page_rank')
+        predictor_block = CountPredictorBlock(consumer_topic=self.TOPICS[3],
+                                              bootstrap_servers=self.BOOTSTRAP_SERVERS,
+                                              producer_topic=self.TOPICS[4],
+                                              spark_session=self.SPARK_SESSION)
+        predictor_block.run()
 
         # wait the all threads run
         while True:

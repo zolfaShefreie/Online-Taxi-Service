@@ -12,4 +12,10 @@ you can access the dataset files in this [link](https://drive.google.com/drive/f
 ## Prerequisites for running
 1. run kafka server<br/>
 make sure "delete.topic.enable=true" is placed in the server.properties and enter bootstrap-server address in .env file
-2. 
+2. run Spark cluster<br/>
+3. run Elasticsearch server
+4. run Kibana server
+5. run Cassandra server
+6. install all packages. <br/>
+pip install -r requirements.txt
+7. run main.py<br/>

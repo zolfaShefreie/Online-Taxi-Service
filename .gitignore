@@ -137,3 +137,5 @@ sorted_data.csv
 
 #spark checkpoints
 checkpoint/
+
+predictor_images/

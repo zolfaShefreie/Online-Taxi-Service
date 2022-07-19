@@ -49,6 +49,7 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
         :return:
         """
         # create keyspace
+        self.session.execute(f"""DROP KEYSPACE IF EXISTS {self.KEYSPACE_NAME.lower()}""")
         self.session.execute(f"""create  keyspace IF NOT EXISTS {self.KEYSPACE_NAME} """ +
                              """with replication={'class': 'SimpleStrategy', 'replication_factor': 3}""")
 
@@ -270,6 +271,7 @@ class CassandraAnalyseBlock(BaseBlock, ABC):
                 self._produce_answer(each)
                 if self.first == 0:
                     self.first += 1
+                self._send_data(data=json.loads(each.value.decode('utf-8')), key=each.key, timestamp_ms=each.timestamp)
         else:
             print("No data in previous phase topic")
 
