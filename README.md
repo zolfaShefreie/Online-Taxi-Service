@@ -19,3 +19,7 @@ make sure "delete.topic.enable=true" is placed in the server.properties and ente
 6. install all packages. <br/>
 pip install -r requirements.txt
 7. run main.py<br/>
+
+## Kibana
+in this project some visualizations and one dashboard is designed. visualizations can be used as one of the visualization 
+in your own dashboard or you can use whole dashboard. in "Saved object" you can import objects.
