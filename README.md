@@ -16,9 +16,15 @@ make sure "delete.topic.enable=true" is placed in the server.properties and ente
 3. run Elasticsearch server
 4. run Kibana server
 5. run Cassandra server
-6. install all packages. <br/>
+6. run redis server
+7. install all packages. <br/>
 pip install -r requirements.txt
-7. run main.py<br/>
+8. run main.py with blew comment:<br/>
+spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.3,com.datastax.spark:spark-cassandra-connector_2.12:3.1.0,graphframes:graphfr
+ames:0.8.2-spark3.1-s_2.12 --master spark://192.168.56.1:7077 main.py<br/>
+<b>this project run on spark 3.1.3 and the version of packages is according to spark-version. 
+make sure version of packages is consistent with spark version on your system</b>
+
 
 ## Kibana
 in this project some visualizations and one dashboard is designed. visualizations can be used as one of the visualization 
