@@ -27,3 +27,6 @@ SAVED_TRANSFORMERS_PATH = os.path.abspath("saved_transformers").replace("\\", "/
 
 # variables for cassandra settings
 KEYSPACE_NAME = env("KEYSPACE_NAME", default="TaxiServiceKeyspace")
+# variables for redis settings
+REDIS_SERVER = env("REDIS_SERVER", default='localhost')
+REDIS_PORT = env("REDIS_PORT", default=None)

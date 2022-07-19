@@ -1,4 +1,4 @@
-﻿confluent-kafka==1.9.0
+confluent-kafka==1.9.0
 kafka-python==2.0.2
 numpy==1.23.0
 pandas==1.4.3
@@ -8,3 +8,5 @@ pytz==2022.1
 six==1.16.0
 elasticsearch==8.1.1
 cassandra-driver==3.25.0
+confluent-kafka==1.9.0
+redis==4.3.4

@@ -11,10 +11,11 @@ from blocks.file_stream import FileStreamBlock
 from blocks.elastic_analyse import ElasticAnalyseBlock
 from blocks.online_cluster import PreTrainedClusteringBlock, OnlineClusteringBlock
 from blocks.cassandra_analyse import CassandraAnalyseBlock
+from blocks.redis_analyse import RedisAnalyseBlock
 
 
 class KafkaManagement:
-    TOPICS = ['FileDataTopic', 'ClusterTopic', 'ElasticTopic', 'CassandraTopic', ]
+    TOPICS = ['FileDataTopic', 'ClusterTopic', 'ElasticTopic', 'CassandraTopic', 'RedisTopic', ]
     TOPIC_PARTITION = 1
     TOPIC_REPLICATION = 1
     BOOTSTRAP_SERVERS = setting_bootstrap_server
@@ -90,7 +91,7 @@ class KafkaManagement:
                                                producer_topic=self.TOPICS[2])
         # TODO consumer_topic=self.TOPICS[1]
         self._make_start_block_thread(block=elastic_analyser, key='elastic_analyser')
-        
+
         # cassandra block
         """# create cluster
         self.cluster = Cluster()
@@ -113,6 +114,11 @@ class KafkaManagement:
         #                                           consumer_topic=self.TOPICS[0],
         #                                           spark_session=self.SPARK_SESSION)
         # online_clustering.run()
+        # redis block
+        redis_analyser = RedisAnalyseBlock(consumer_topic=self.TOPICS[0], bootstrap_servers=self.BOOTSTRAP_SERVERS,
+                                           producer_topic=self.TOPICS[4])
+        # TODO consumer_topic=self.TOPICS[3]
+        self._make_start_block_thread(block=redis_analyser, key='redis_analyser')
 
         # wait the all threads run
         while True:
