@@ -4,15 +4,17 @@ import threading
 import findspark
 findspark.init()
 from pyspark.sql import SparkSession
+from cassandra.cluster import Cluster
 
 from settings import BOOTSTRAP_SERVERS as setting_bootstrap_server
 from blocks.file_stream import FileStreamBlock
 from blocks.elastic_analyse import ElasticAnalyseBlock
 from blocks.online_cluster import PreTrainedClusteringBlock, OnlineClusteringBlock
+from blocks.cassandra_analyse import CassandraAnalyseBlock
 
 
 class KafkaManagement:
-    TOPICS = ['FileDataTopic', 'ClusterTopic', 'ElasticTopic', ]
+    TOPICS = ['FileDataTopic', 'ClusterTopic', 'ElasticTopic', 'CassandraTopic', ]
     TOPIC_PARTITION = 1
     TOPIC_REPLICATION = 1
     BOOTSTRAP_SERVERS = setting_bootstrap_server
@@ -88,6 +90,17 @@ class KafkaManagement:
                                                producer_topic=self.TOPICS[2])
         # TODO consumer_topic=self.TOPICS[1]
         self._make_start_block_thread(block=elastic_analyser, key='elastic_analyser')
+        
+        # cassandra block
+        """# create cluster
+        self.cluster = Cluster()
+        # create session
+        self.session = self.cluster.connect()"""
+        cassandra_analyse = CassandraAnalyseBlock(consumer_topic=self.TOPICS[0],
+                                                  bootstrap_servers=self.BOOTSTRAP_SERVERS,
+                                                  producer_topic=self.TOPICS[3])
+        # TODO consumer_topic=self.TOPICS[2]
+        self._make_start_block_thread(block=cassandra_analyse, key='cassandra_analyse')
 
         pre_trained_cluster = PreTrainedClusteringBlock(bootstrap_servers=self.BOOTSTRAP_SERVERS,
                                                         producer_topic=self.TOPICS[1],
