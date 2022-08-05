@@ -122,7 +122,7 @@ class KafkaManagement:
                                               bootstrap_servers=self.BOOTSTRAP_SERVERS,
                                               producer_topic=self.TOPICS[5],
                                               spark_session=self.SPARK_SESSION)
-        predictor_block.run()
+        self._make_start_block_thread(block=predictor_block, key='predictor_block')
 
         page_rank = PageRankBlock(consumer_topic=self.TOPICS[5],
                                   bootstrap_servers=self.BOOTSTRAP_SERVERS,
